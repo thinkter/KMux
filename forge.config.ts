@@ -13,7 +13,7 @@ const config: ForgeConfig = {
     asar: true,
   },
   rebuildConfig: {
-    ignoreModules: ["node-pty"],
+    onlyModules: ["node-pty"],
   },
   makers: [
     new MakerSquirrel({}),
