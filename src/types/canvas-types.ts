@@ -6,6 +6,7 @@ export interface Terminal {
 
 export interface Workspace {
   id: string;
+  title: string;
   terminals: Terminal[];
   activeTerminalIndex: number; // horizontal offset 0, 1, 2...
 }

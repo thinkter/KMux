@@ -20,25 +20,31 @@ export const WorkspaceRow: React.FC<Props> = ({ workspace, isActiveWorkspace }) 
 
     const { activeTerminalIndex, terminals } = workspace;
 
-    // Calculate the left edge of the active terminal
-    let activeLeft = 0;
-    for (let i = 0; i < activeTerminalIndex; i++) {
-      activeLeft += getWidthVW(terminals[i].widthFraction) + GAPS_VW;
+    // 1. Calculate total width of the entire row
+    let totalRowWidth = 0;
+    terminals.forEach(t => {
+      totalRowWidth += getWidthVW(t.widthFraction) + GAPS_VW;
+    });
+    // Remove the trailing gap for the last terminal for true centering logic
+    totalRowWidth -= GAPS_VW;
+
+    let targetOffset = 0;
+
+    // 2. If the entire row fits on screen, center the ROW instead of the terminal
+    if (totalRowWidth <= 102) {
+      targetOffset = (totalRowWidth - 100) / 2;
+    } else {
+      // 3. Otherwise, center the active terminal as before
+      let activeLeft = 0;
+      for (let i = 0; i < activeTerminalIndex; i++) {
+        activeLeft += getWidthVW(terminals[i].widthFraction) + GAPS_VW;
+      }
+      const activeWidth = getWidthVW(terminals[activeTerminalIndex].widthFraction);
+      targetOffset = activeLeft + (activeWidth / 2) - 50 + (GAPS_VW / 2);
     }
     
-    const activeWidth = getWidthVW(terminals[activeTerminalIndex].widthFraction);
-    
-    // We want the active terminal to ideally be center-aligned or at least fully visible.
-    // Let's try to center it: viewportCenter = 50vw. 
-    // So target viewOffset = activeLeft + (activeWidth / 2) - 50.
-    let targetOffset = activeLeft + (activeWidth / 2) - 50 + (GAPS_VW / 2);
-    
-    // NO CLAMPING: We allow negative offsets (which shifts row right) to ensure 
-    // centering works for the first terminal without seeing only edge-aligned terminals.
-    // targetOffset = Math.max(0, targetOffset); // Commented out to allow centering early terminals
-
-    // If it's a new terminal or we swapped, we update the offset
-    if (Math.abs(targetOffset - viewOffset) > 0.1) {
+    // Smooth update check
+    if (Math.abs(targetOffset - viewOffset) > 0.01) {
       setViewOffset(targetOffset);
     }
   }, [workspace.activeTerminalIndex, workspace.terminals]);
@@ -76,7 +82,7 @@ export const WorkspaceRow: React.FC<Props> = ({ workspace, isActiveWorkspace }) 
       ) : (
         /* Horizontal scrolling terminal row */
         <div
-          className="flex transition-transform duration-700 ease-[cubic-bezier(0.2,0.8,0.2,1)]"
+          className="flex transition-transform duration-[800ms] ease-[cubic-bezier(0.25,1,0.5,1)]"
           style={{ transform: `translateX(${-viewOffset}vw)` }}
         >
           {workspace.terminals.map((term, index) => (

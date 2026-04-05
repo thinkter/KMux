@@ -1,16 +1,10 @@
 /**
- * TerminalPanel.tsx — STUB
- *
- * This is a placeholder owned by Divyansh (Aesthetic Render & Terminal UI).
- * It is scaffolded here purely so the project compiles while Divyansh's
- * real implementation is in progress.
- *
- * DO NOT build permanent UI here — Divyansh owns this file.
+ * TerminalPanel.tsx — Cinematic Render (Final Pass)
  */
 
 import React from 'react';
 import { useCanvasStore } from '../store/useCanvasStore';
-import type { Terminal } from '../types';
+import type { Terminal } from '../types/canvas-types';
 import { getWidthVWString } from '../utils/layout';
 
 interface Props {
@@ -19,70 +13,86 @@ interface Props {
 }
 
 export const TerminalPanel: React.FC<Props> = ({ terminal, isActive }) => {
-  const { theme } = useCanvasStore();
+  const { theme, workspaces, activeWorkspaceIndex, isOverview } = useCanvasStore();
   const w = getWidthVWString(terminal.widthFraction);
+
+  const currentWS = workspaces[activeWorkspaceIndex];
+  const totalCount = currentWS?.terminals.length || 0;
+  const currentIndex = currentWS?.terminals.findIndex(t => t.id === terminal.id) ?? 0;
+
+  // 💡 OVERVIEW LOGIC: In overview mode, everything should be fully bright (1).
+  // In regular mode, inactive terminals are "highly" visible (0.9).
+  const displayOpacity = isOverview ? 1 : (isActive ? 1 : 0.9);
 
   return (
     <div
       style={{
         width: w,
-        height: '75vh',
+        height: '78vh',
         flexShrink: 0,
         margin: '0 1.5vw',
-        borderRadius: '12px',
-        border: `1px solid ${isActive ? theme.accent : theme.border}`,
+        borderRadius: '20px',
+        border: (isActive || isOverview) ? `1.5px solid ${theme.accent}${isActive ? '' : '40'}` : '1.5px solid transparent',
         background: theme.panelBg,
-        backdropFilter: 'blur(24px)',
-        boxShadow: isActive
-          ? `0 0 40px ${theme.accent}20, inset 0 0 0 1px ${theme.accent}10`
-          : 'none',
-        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-        opacity: isActive ? 1 : 0.45,
+        backdropFilter: (isActive || isOverview) ? 'blur(32px) saturate(160%)' : 'blur(10px)',
+        transition: 'all 0.6s cubic-bezier(0.22, 1, 0.36, 1)',
+        opacity: displayOpacity,
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
+        position: 'relative',
+        boxShadow: isActive ? `inset 0 0 60px ${theme.accent}10` : 'none',
       }}
     >
-      {/* Fake title bar */}
+      {/* Title bar */}
       <div
         style={{
-          padding: '10px 16px',
-          borderBottom: `1px solid ${theme.border}`,
+          padding: '14px 22px',
+          borderBottom: `1px solid ${isActive ? theme.border : 'transparent'}`,
           display: 'flex',
           alignItems: 'center',
-          gap: '8px',
+          justifyContent: 'space-between',
+          background: 'rgba(255,255,255,0.02)',
         }}
       >
-        <span style={{ width: 10, height: 10, borderRadius: '50%', background: theme.accent, opacity: 0.8, display: 'inline-block' }} />
-        <span style={{ width: 10, height: 10, borderRadius: '50%', background: theme.textDim, display: 'inline-block' }} />
-        <span style={{ width: 10, height: 10, borderRadius: '50%', background: theme.textDim, display: 'inline-block' }} />
-        <span
-          style={{
-            marginLeft: 8,
-            fontFamily: 'JetBrains Mono, IBM Plex Mono, monospace',
-            fontSize: 11,
-            color: theme.textDim,
-            letterSpacing: '0.08em',
-          }}
-        >
-          {terminal.title}
-        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div style={{ display: 'flex', gap: '6px' }}>
+            <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#ff5f56b0' }} />
+            <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#ffbd2eb0' }} />
+            <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#27c93fb0' }} />
+          </div>
+          <span
+            style={{
+              marginLeft: 8,
+              fontFamily: 'JetBrains Mono, monospace',
+              fontSize: 10,
+              color: isActive ? theme.accent : theme.textDim,
+              letterSpacing: '0.15em',
+              textTransform: 'uppercase',
+              fontWeight: 500,
+              opacity: (isActive || isOverview) ? 1 : 0.5,
+            }}
+          >
+            {terminal.title}
+          </span>
+        </div>
       </div>
 
-      {/* Placeholder body — xterm.js goes here (Team 1 integration) */}
+      {/* Body placeholder */}
       <div
         style={{
           flex: 1,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          fontFamily: 'JetBrains Mono, IBM Plex Mono, monospace',
-          fontSize: 11,
-          color: 'rgba(232,220,200,0.15)',
-          letterSpacing: '0.2em',
+          fontFamily: 'JetBrains Mono, monospace',
+          fontSize: 12,
+          color: theme.accent,
+          opacity: 0.1,
+          letterSpacing: '0.4em',
         }}
       >
-        {isActive ? '▋' : '·'}
+        TERMINAL PLACEHOLDER
       </div>
     </div>
   );

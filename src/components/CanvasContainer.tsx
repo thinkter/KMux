@@ -53,29 +53,23 @@ export const CanvasContainer: React.FC = () => {
         className="absolute inset-0 pointer-events-none"
         style={{
           background: `
-            radial-gradient(ellipse 60% 50% at 30% 45%, ${theme.accent}20 0%, transparent 70%),
-            radial-gradient(ellipse 50% 45% at 80% 80%, rgba(100,20,120,0.08) 0%, transparent 65%),
-            radial-gradient(ellipse 40% 30% at 70% 20%, ${theme.accent}0a 0%, transparent 60%)
+            radial-gradient(ellipse 60% 50% at 35% 40%, ${theme.accent}0a 0%, transparent 75%),
+            radial-gradient(ellipse 45% 40% at 85% 85%, rgba(100,20,120,0.04) 0%, transparent 70%),
+            radial-gradient(ellipse 40% 30% at 75% 15%, ${theme.accent}05 0%, transparent 65%)
           `,
         }}
       />
 
-      {/* Subtle grid texture */}
-      <div
-        className="absolute inset-0 pointer-events-none opacity-[0.03]"
-        style={{
-          backgroundImage: `linear-gradient(${theme.text}30 1px, transparent 1px), linear-gradient(90deg, ${theme.text}30 1px, transparent 1px)`,
-          backgroundSize: '80px 80px',
-        }}
-      />
+      {/* Deep Obsidian Background */}
+      {/* (Grid removed at user request) */}
 
       {/* ── Main canvas — vertical + overview transforms applied here ── */}
       <div
-        className="w-full h-full transition-transform duration-700 ease-[cubic-bezier(0.2,0.8,0.2,1)]"
-        style={{ transform: isOverview ? 'scale(0.28)' : 'scale(1)' }}
+        className="w-full h-full transition-transform duration-[850ms] ease-[cubic-bezier(0.25,1,0.5,1)]"
+        style={{ transform: isOverview ? 'scale(0.3)' : 'scale(1)' }}
       >
         <div
-          className="flex flex-col transition-transform duration-700 ease-[cubic-bezier(0.2,0.8,0.2,1)] will-change-transform"
+          className="flex flex-col transition-transform duration-[850ms] ease-[cubic-bezier(0.25,1,0.5,1)] will-change-transform"
           style={{ transform: `translateY(${translateY}vh)` }}
         >
           {workspaces.map((ws, i) => (

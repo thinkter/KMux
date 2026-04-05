@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { v4 as uuidv4 } from 'uuid';
-import type { CanvasState, Workspace, Terminal, Theme } from '../types';
+import type { CanvasState, Workspace, Terminal, Theme } from '../types/canvas-types';
 
 export type { Workspace, Terminal };
 
@@ -10,11 +10,11 @@ const WIDTH_CYCLE: Terminal['widthFraction'][] = ['1', '2/3', '1/2', '1/3'];
 const THEMES: Record<string, Theme> = {
   standard: {
     name: 'Standard',
-    bg: '#0d0806',
-    panelBg: 'rgba(13,8,6,0.85)',
+    bg: '#050302',
+    panelBg: 'rgba(22, 16, 13, 0.94)',
     accent: '#ff6e3c',
     text: '#e8dcc8',
-    textDim: 'rgba(232,220,200,0.4)',
+    textDim: 'rgba(232,220,200,0.3)',
     border: 'rgba(232,220,200,0.08)',
   },
   midnight: {
@@ -43,6 +43,7 @@ export const useCanvasStore = create<CanvasState>()(
       workspaces: [
         {
           id: uuidv4(),
+          title: 'Workspace 1',
           terminals: [
             {
               id: uuidv4(),
@@ -102,8 +103,10 @@ export const useCanvasStore = create<CanvasState>()(
           
           if (direction === 'down' && isAtBottom) {
             // Auto-create workspace if moving down at the bottom of the stack
+            const newWidth = state.workspaces.length + 1;
             const newWorkspace: Workspace = {
               id: uuidv4(),
+              title: `Workspace ${newWidth}`,
               terminals: [{ id: uuidv4(), title: 'Terminal 1', widthFraction: '1' }],
               activeTerminalIndex: 0,
             };
@@ -181,17 +184,40 @@ export const useCanvasStore = create<CanvasState>()(
           const ws = state.workspaces[state.activeWorkspaceIndex];
           if (!ws || ws.terminals.length === 0) return state;
 
-          const newTerminals = ws.terminals.filter(
-            (_, i) => i !== ws.activeTerminalIndex,
-          );
-          const newIndex = Math.max(0, ws.activeTerminalIndex - 1);
-          const updatedWorkspaces = [...state.workspaces];
-          updatedWorkspaces[state.activeWorkspaceIndex] = {
-            ...ws,
-            terminals: newTerminals,
-            activeTerminalIndex: newIndex,
-          };
-          return { workspaces: updatedWorkspaces };
+          const newWorkspaces = [...state.workspaces];
+          const currentWs = { ...ws, terminals: [...ws.terminals] };
+          
+          currentWs.terminals.splice(currentWs.activeTerminalIndex, 1);
+          
+          // Fix out-of-bounds index for terminals
+          if (currentWs.activeTerminalIndex >= currentWs.terminals.length) {
+            currentWs.activeTerminalIndex = Math.max(0, currentWs.terminals.length - 1);
+          }
+
+          // 🧹 AUTO-DESTROY: If workspace is now empty, remove it 
+          // (Unless it's the absolute last workspace, we keep it as a clean slate)
+          if (currentWs.terminals.length === 0 && newWorkspaces.length > 1) {
+            newWorkspaces.splice(state.activeWorkspaceIndex, 1);
+            
+            // 🔢 RE-INDEX: Ensure Workspace 1, 2, 3... stay in sequence
+            newWorkspaces.forEach((ws, idx) => {
+              ws.title = `Workspace ${idx + 1}`;
+            });
+
+            // Recalculate workspace index after destruction
+            let newWSIndex = state.activeWorkspaceIndex;
+            if (newWSIndex >= newWorkspaces.length) {
+              newWSIndex = newWorkspaces.length - 1;
+            }
+            
+            return {
+              workspaces: newWorkspaces,
+              activeWorkspaceIndex: newWSIndex
+            };
+          }
+
+          newWorkspaces[state.activeWorkspaceIndex] = currentWs;
+          return { workspaces: newWorkspaces };
         });
       },
 
@@ -224,14 +250,19 @@ export const useCanvasStore = create<CanvasState>()(
 
       addWorkspace: () => {
         set((state) => {
-          const newWorkspace: Workspace = {
+          const newWorkspaces = [...state.workspaces];
+          newWorkspaces.push({
             id: uuidv4(),
-            terminals: [{ id: uuidv4(), title: 'Terminal 1', widthFraction: '1' }],
+            title: `Workspace ${newWorkspaces.length + 1}`,
+            terminals: [
+              { id: uuidv4(), title: 'Terminal 1', widthFraction: '1' }
+            ],
             activeTerminalIndex: 0,
-          };
-          return {
-            workspaces: [...state.workspaces, newWorkspace],
-            activeWorkspaceIndex: state.workspaces.length,
+          });
+
+          return { 
+            workspaces: newWorkspaces, 
+            activeWorkspaceIndex: newWorkspaces.length - 1 
           };
         });
       },
