@@ -7,6 +7,7 @@ import React, {
   useState,
 } from 'react';
 import { useCanvasStore } from '../../../store/useCanvasStore';
+import type { TerminalProfileId } from '../../shared/terminal-profiles';
 import type { TerminalSessionSnapshot } from '../../shared/terminal-types';
 
 type TerminalOutputSink = (data: string) => void;
@@ -68,6 +69,15 @@ export const TerminalRuntimeProvider: React.FC<React.PropsWithChildren> = ({ chi
     () => workspaces.flatMap((workspace) => workspace.terminals.map((terminal) => terminal.id)),
     [workspaces],
   );
+  const terminalProfileById = useMemo<Record<string, TerminalProfileId | undefined>>(() => {
+    const profileMap: Record<string, TerminalProfileId | undefined> = {};
+    for (const workspace of workspaces) {
+      for (const terminal of workspace.terminals) {
+        profileMap[terminal.id] = terminal.profileId;
+      }
+    }
+    return profileMap;
+  }, [workspaces]);
 
   const [sessions, setSessions] = useState<TerminalSessionMap>({});
   const previousIdsRef = useRef<Set<string>>(new Set());
@@ -179,6 +189,7 @@ export const TerminalRuntimeProvider: React.FC<React.PropsWithChildren> = ({ chi
             terminalId,
             cols: DEFAULT_COLS,
             rows: DEFAULT_ROWS,
+            profileId: terminalProfileById[terminalId],
           })
           .then((snapshot) => {
             const retryId = createRetryTimersRef.current.get(terminalId);
@@ -239,7 +250,7 @@ export const TerminalRuntimeProvider: React.FC<React.PropsWithChildren> = ({ chi
         return next;
       });
     }
-  }, [terminalIds]);
+  }, [terminalIds, terminalProfileById]);
 
   const registerOutputSink = useCallback(
     (terminalId: string, sink: TerminalOutputSink): (() => void) => {

@@ -5,6 +5,7 @@ import type {
   TerminalErrorEvent,
   TerminalExitEvent,
   TerminalOutputEvent,
+  TerminalProfile,
   TerminalSessionSnapshot,
   TerminalStateEvent,
 } from './terminal/shared/terminal-types';
@@ -34,6 +35,9 @@ const terminalApi: TerminalApi = {
   },
   listTerminals: async (): Promise<TerminalSessionSnapshot[]> => {
     return ipcRenderer.invoke(TERMINAL_IPC_CHANNELS.list);
+  },
+  listTerminalProfiles: async (): Promise<TerminalProfile[]> => {
+    return ipcRenderer.invoke(TERMINAL_IPC_CHANNELS.listProfiles);
   },
   onTerminalOutput: (listener) => {
     return subscribe<TerminalOutputEvent>(TERMINAL_IPC_CHANNELS.output, listener);

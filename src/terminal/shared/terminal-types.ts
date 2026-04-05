@@ -1,8 +1,12 @@
+import type { TerminalProfile, TerminalProfileId } from './terminal-profiles';
+export type { TerminalProfile, TerminalProfileId } from './terminal-profiles';
+
 export type TerminalStatus = 'starting' | 'running' | 'exited' | 'error';
 
 export interface TerminalSessionSnapshot {
   terminalId: string;
   pid: number | null;
+  profileId?: TerminalProfileId;
   shell: string;
   cwd: string;
   cols: number;
@@ -18,6 +22,7 @@ export interface CreateTerminalRequest {
   cols: number;
   rows: number;
   cwd?: string;
+  profileId?: TerminalProfileId;
 }
 
 export interface WriteTerminalRequest {
@@ -62,6 +67,7 @@ export interface TerminalApi {
   resizeTerminal: (request: ResizeTerminalRequest) => Promise<void>;
   killTerminal: (request: KillTerminalRequest) => Promise<void>;
   listTerminals: () => Promise<TerminalSessionSnapshot[]>;
+  listTerminalProfiles: () => Promise<TerminalProfile[]>;
   onTerminalOutput: (listener: (event: TerminalOutputEvent) => void) => () => void;
   onTerminalExit: (listener: (event: TerminalExitEvent) => void) => () => void;
   onTerminalState: (listener: (event: TerminalStateEvent) => void) => () => void;

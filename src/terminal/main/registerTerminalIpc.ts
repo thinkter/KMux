@@ -62,6 +62,10 @@ export const registerTerminalIpc = ({
     return terminalManager.listTerminals();
   });
 
+  ipcMain.handle(TERMINAL_IPC_CHANNELS.listProfiles, () => {
+    return terminalManager.listProfiles();
+  });
+
   const detachOutput = terminalManager.onOutput((event: TerminalOutputEvent) => {
     broadcastToWindows(getWindows(), TERMINAL_IPC_CHANNELS.output, event);
   });
@@ -81,6 +85,7 @@ export const registerTerminalIpc = ({
     ipcMain.removeHandler(TERMINAL_IPC_CHANNELS.resize);
     ipcMain.removeHandler(TERMINAL_IPC_CHANNELS.kill);
     ipcMain.removeHandler(TERMINAL_IPC_CHANNELS.list);
+    ipcMain.removeHandler(TERMINAL_IPC_CHANNELS.listProfiles);
 
     detachOutput();
     detachExit();

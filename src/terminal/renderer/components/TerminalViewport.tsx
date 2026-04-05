@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import type { Terminal as XtermTerminal } from '@xterm/xterm';
 import { useCanvasStore } from '../../../store/useCanvasStore';
 import type { TerminalSessionSnapshot } from '../../shared/terminal-types';
@@ -26,6 +26,8 @@ export const TerminalViewport: React.FC<Props> = ({ terminalId, isActive }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const xtermRef = useRef<XtermTerminal | null>(null);
   const bootstrappedRef = useRef(false);
+  const hideScrollbarTimerRef = useRef<number | null>(null);
+  const [isScrolling, setIsScrolling] = useState(false);
 
   const session = sessions[terminalId];
 
@@ -38,6 +40,7 @@ export const TerminalViewport: React.FC<Props> = ({ terminalId, isActive }) => {
     const { terminal, fitAddon } = createXterm(toXtermTheme(theme));
     xtermRef.current = terminal;
     terminal.open(container);
+    const viewport = container.querySelector('.xterm-viewport');
 
     const detachOutput = registerOutputSink(terminalId, (chunk) => {
       terminal.write(chunk);
@@ -55,7 +58,31 @@ export const TerminalViewport: React.FC<Props> = ({ terminalId, isActive }) => {
       });
     });
 
+    const onViewportActivity = (): void => {
+      setIsScrolling(true);
+      if (hideScrollbarTimerRef.current !== null) {
+        window.clearTimeout(hideScrollbarTimerRef.current);
+      }
+      hideScrollbarTimerRef.current = window.setTimeout(() => {
+        setIsScrolling(false);
+        hideScrollbarTimerRef.current = null;
+      }, 700);
+    };
+
+    if (viewport instanceof HTMLElement) {
+      viewport.addEventListener('wheel', onViewportActivity, { passive: true });
+      viewport.addEventListener('scroll', onViewportActivity, { passive: true });
+    }
+
     return () => {
+      if (viewport instanceof HTMLElement) {
+        viewport.removeEventListener('wheel', onViewportActivity);
+        viewport.removeEventListener('scroll', onViewportActivity);
+      }
+      if (hideScrollbarTimerRef.current !== null) {
+        window.clearTimeout(hideScrollbarTimerRef.current);
+        hideScrollbarTimerRef.current = null;
+      }
       stopObserving();
       inputDisposable.dispose();
       detachOutput();
@@ -92,7 +119,7 @@ export const TerminalViewport: React.FC<Props> = ({ terminalId, isActive }) => {
   }, [session]);
 
   return (
-    <div className="w-full h-full relative">
+    <div className={`w-full h-full relative terminal-viewport-shell ${isScrolling ? 'is-scrolling' : ''}`}>
       <div ref={containerRef} className="w-full h-full px-3 py-2" />
       <div
         className="absolute right-3 bottom-2 rounded px-2 py-0.5 text-[10px] font-mono uppercase tracking-wider pointer-events-none"

@@ -1,11 +1,12 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import { v4 as uuidv4 } from 'uuid';
 import type { CanvasState, Workspace, Terminal, Theme } from '../types/canvas-types';
+import type { TerminalProfileId } from '../terminal/shared/terminal-profiles';
 
 export type { Workspace, Terminal };
 
 const WIDTH_CYCLE: Terminal['widthFraction'][] = ['1', '2/3', '1/2', '1/3'];
+const createId = (): string => crypto.randomUUID();
 
 const THEMES: Record<string, Theme> = {
   standard: {
@@ -42,11 +43,11 @@ export const useCanvasStore = create<CanvasState>()(
     (set, get) => ({
       workspaces: [
         {
-          id: uuidv4(),
+          id: createId(),
           title: 'Workspace 1',
           terminals: [
             {
-              id: uuidv4(),
+              id: createId(),
               title: 'Terminal 1',
               widthFraction: '1',
             },
@@ -105,9 +106,9 @@ export const useCanvasStore = create<CanvasState>()(
             // Auto-create workspace if moving down at the bottom of the stack
             const newWidth = state.workspaces.length + 1;
             const newWorkspace: Workspace = {
-              id: uuidv4(),
+              id: createId(),
               title: `Workspace ${newWidth}`,
-              terminals: [{ id: uuidv4(), title: 'Terminal 1', widthFraction: '1' }],
+              terminals: [{ id: createId(), title: 'Terminal 1', widthFraction: '1' }],
               activeTerminalIndex: 0,
             };
             return {
@@ -158,15 +159,16 @@ export const useCanvasStore = create<CanvasState>()(
         });
       },
 
-      addTerminal: () => {
+      addTerminal: (profileId?: TerminalProfileId) => {
         set((state) => {
           const ws = state.workspaces[state.activeWorkspaceIndex];
           if (!ws) return state;
 
           const newTerminal: Terminal = {
-            id: uuidv4(),
+            id: createId(),
             title: `Terminal ${ws.terminals.length + 1}`,
             widthFraction: '1',
+            profileId,
           };
           const updatedWorkspace: Workspace = {
             ...ws,
@@ -194,12 +196,12 @@ export const useCanvasStore = create<CanvasState>()(
             currentWs.activeTerminalIndex = Math.max(0, currentWs.terminals.length - 1);
           }
 
-          // 🧹 AUTO-DESTROY: If workspace is now empty, remove it 
+          // Auto-destroy: if workspace is now empty, remove it.
           // (Unless it's the absolute last workspace, we keep it as a clean slate)
           if (currentWs.terminals.length === 0 && newWorkspaces.length > 1) {
             newWorkspaces.splice(state.activeWorkspaceIndex, 1);
             
-            // 🔢 RE-INDEX: Ensure Workspace 1, 2, 3... stay in sequence
+            // Re-index: keep Workspace 1, 2, 3 in sequence.
             newWorkspaces.forEach((ws, idx) => {
               ws.title = `Workspace ${idx + 1}`;
             });
@@ -248,14 +250,19 @@ export const useCanvasStore = create<CanvasState>()(
         });
       },
 
-      addWorkspace: () => {
+      addWorkspace: (profileId?: TerminalProfileId) => {
         set((state) => {
           const newWorkspaces = [...state.workspaces];
           newWorkspaces.push({
-            id: uuidv4(),
+            id: createId(),
             title: `Workspace ${newWorkspaces.length + 1}`,
             terminals: [
-              { id: uuidv4(), title: 'Terminal 1', widthFraction: '1' }
+              {
+                id: createId(),
+                title: 'Terminal 1',
+                widthFraction: '1',
+                profileId,
+              }
             ],
             activeTerminalIndex: 0,
           });

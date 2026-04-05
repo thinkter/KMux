@@ -1,7 +1,10 @@
+import type { TerminalProfileId } from '../terminal/shared/terminal-profiles';
+
 export interface Terminal {
   id: string;
   title: string;
   widthFraction?: '1/3' | '1/2' | '2/3' | '1'; // Prradyun's WorkspaceRow uses this for horizontal sizing
+  profileId?: TerminalProfileId;
 }
 
 export interface Workspace {
@@ -35,8 +38,8 @@ export interface CanvasState {
   moveWorkspace: (direction: 'up' | 'down') => void;
   moveTerminal: (direction: 'left' | 'right') => void;
   jumpToTerminal: (index: number) => void;
-  addTerminal: () => void;
-  addWorkspace: () => void;
+  addTerminal: (profileId?: TerminalProfileId) => void;
+  addWorkspace: (profileId?: TerminalProfileId) => void;
   removeTerminal: () => void;
   resizeTerminal: (direction: 'shrink' | 'expand') => void;
   toggleOverview: () => void;

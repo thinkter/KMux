@@ -4,6 +4,7 @@ import type {
   ResizeTerminalRequest,
   WriteTerminalRequest,
 } from './terminal-types';
+import { isTerminalProfileId } from './terminal-profiles';
 
 const MIN_TERMINAL_DIMENSION = 2;
 
@@ -37,6 +38,7 @@ export const TERMINAL_IPC_CHANNELS = {
   resize: 'terminal:resize',
   kill: 'terminal:kill',
   list: 'terminal:list',
+  listProfiles: 'terminal:list-profiles',
   output: 'terminal:output',
   exit: 'terminal:exit',
   state: 'terminal:state',
@@ -54,6 +56,9 @@ export function assertCreateTerminalRequest(
   assertDimension(payload.rows, 'rows');
   if (payload.cwd !== undefined) {
     assertNonEmptyString(payload.cwd, 'cwd');
+  }
+  if (payload.profileId !== undefined && !isTerminalProfileId(payload.profileId)) {
+    throw new Error('Invalid profileId.');
   }
 }
 

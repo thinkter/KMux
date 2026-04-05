@@ -2,6 +2,7 @@ import { EventEmitter } from 'node:events';
 import os from 'node:os';
 import * as pty from 'node-pty';
 import type { IPty } from 'node-pty';
+import type { TerminalProfile } from '../shared/terminal-profiles';
 import type {
   CreateTerminalRequest,
   KillTerminalRequest,
@@ -13,7 +14,7 @@ import type {
   TerminalStateEvent,
   WriteTerminalRequest,
 } from '../shared/terminal-types';
-import { resolveShell } from './shell/resolveShell';
+import { listTerminalProfiles, resolveShell } from './shell/resolveShell';
 import { buildPtyEnv } from './utils/env';
 
 const TERMINAL_EVENT_NAMES = {
@@ -51,7 +52,7 @@ export class TerminalManager {
       return { ...existing.snapshot };
     }
 
-    const shell = resolveShell(process.platform, process.env);
+    const shell = resolveShell(process.platform, process.env, request.profileId);
     const cols = normalizeDimension(request.cols);
     const rows = normalizeDimension(request.rows);
     const cwd = request.cwd ?? os.homedir();
@@ -78,6 +79,7 @@ export class TerminalManager {
     const snapshot: TerminalSessionSnapshot = {
       terminalId: request.terminalId,
       pid: ptyProcess.pid,
+      profileId: request.profileId,
       shell: shell.label,
       cwd,
       cols,
@@ -161,6 +163,10 @@ export class TerminalManager {
 
   public listTerminals(): TerminalSessionSnapshot[] {
     return [...this.sessions.values()].map((session) => ({ ...session.snapshot }));
+  }
+
+  public listProfiles(): TerminalProfile[] {
+    return listTerminalProfiles(process.platform);
   }
 
   public onOutput(listener: (event: TerminalOutputEvent) => void): () => void {
