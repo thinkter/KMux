@@ -12,12 +12,14 @@ const createWindow = () => {
     width: 1000,
     height: 720,
     backgroundColor: '#111827',
+    autoHideMenuBar: true,
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
       preload: path.join(__dirname, 'preload.js'),
     },
   });
+  mainWindow.setMenu(null);
 
   // and load the index.html of the app.
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
