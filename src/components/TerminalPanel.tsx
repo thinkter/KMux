@@ -5,6 +5,7 @@
 import React from 'react';
 import { useCanvasStore } from '../store/useCanvasStore';
 import type { Terminal } from '../types/canvas-types';
+import { TerminalViewport } from '../terminal/renderer/components/TerminalViewport';
 import { getWidthVWString } from '../utils/layout';
 
 interface Props {
@@ -13,12 +14,8 @@ interface Props {
 }
 
 export const TerminalPanel: React.FC<Props> = ({ terminal, isActive }) => {
-  const { theme, workspaces, activeWorkspaceIndex, isOverview } = useCanvasStore();
+  const { theme, isOverview } = useCanvasStore();
   const w = getWidthVWString(terminal.widthFraction);
-
-  const currentWS = workspaces[activeWorkspaceIndex];
-  const totalCount = currentWS?.terminals.length || 0;
-  const currentIndex = currentWS?.terminals.findIndex(t => t.id === terminal.id) ?? 0;
 
   // 💡 OVERVIEW LOGIC: In overview mode, everything should be fully bright (1).
   // In regular mode, inactive terminals are "highly" visible (0.9).
@@ -78,21 +75,14 @@ export const TerminalPanel: React.FC<Props> = ({ terminal, isActive }) => {
         </div>
       </div>
 
-      {/* Body placeholder */}
+      {/* Live xterm viewport */}
       <div
         style={{
           flex: 1,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          fontFamily: 'JetBrains Mono, monospace',
-          fontSize: 12,
-          color: theme.accent,
-          opacity: 0.1,
-          letterSpacing: '0.4em',
+          minHeight: 0,
         }}
       >
-        TERMINAL PLACEHOLDER
+        <TerminalViewport terminalId={terminal.id} isActive={isActive} />
       </div>
     </div>
   );

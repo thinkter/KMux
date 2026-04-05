@@ -8,8 +8,13 @@
 import React from 'react';
 import { useKeyboardNav } from './hooks/useKeyboardNav';
 import { CanvasContainer } from './components/CanvasContainer';
+import { TerminalRuntimeProvider } from './terminal/renderer/context/TerminalRuntimeProvider';
 
 export default function App(): React.JSX.Element {
   useKeyboardNav();
-  return <CanvasContainer />;
+  return (
+    <TerminalRuntimeProvider>
+      <CanvasContainer />
+    </TerminalRuntimeProvider>
+  );
 }
