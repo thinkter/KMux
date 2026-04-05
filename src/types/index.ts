@@ -1,6 +1,7 @@
 export interface Terminal {
   id: string;
   title: string;
+  widthFraction?: '1/3' | '1/2' | '2/3' | '1'; // Prradyun's WorkspaceRow uses this for horizontal sizing
 }
 
 export interface Workspace {
@@ -9,20 +10,33 @@ export interface Workspace {
   activeTerminalIndex: number; // horizontal offset 0, 1, 2...
 }
 
+export interface Theme {
+  name: string;
+  bg: string;
+  panelBg: string;
+  accent: string;
+  text: string;
+  textDim: string;
+  border: string;
+}
+
 export interface CanvasState {
   workspaces: Workspace[];
   activeWorkspaceIndex: number; // vertical offset 0, 1, 2...
+  isOverview: boolean;          // CanvasContainer uses this for scale(0.28) zoom-out
+  isSearchOpen: boolean;
+  theme: Theme;
 
-  // From specific interface definition
+  setTheme: (themeName: string) => void;
+  cycleThemes: () => void;
+  toggleSearch: () => void;
+  jumpToGlobalTerminal: (terminalId: string) => void;
   moveWorkspace: (direction: 'up' | 'down') => void;
   moveTerminal: (direction: 'left' | 'right') => void;
+  jumpToTerminal: (index: number) => void;
   addTerminal: () => void;
   addWorkspace: () => void;
-
-  // Exact names mentioned in Sujal's responsibilities
-  moveRight: () => void;
-  moveLeft: () => void;
-  moveUp: () => void;
-  moveDown: () => void;
-  spawnTerminal: () => void;
+  removeTerminal: () => void;
+  resizeTerminal: (direction: 'shrink' | 'expand') => void;
+  toggleOverview: () => void;
 }
