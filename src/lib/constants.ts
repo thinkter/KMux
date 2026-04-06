@@ -3,9 +3,9 @@ import { Theme } from '../types/canvas-types';
 /**
  * Spatial Layout Configurations (vw/vh)
  */
-export const CAMERA_PADDING = 6;
+export const CAMERA_PADDING = 4;
 export const CAMERA_SOLITAIRE_MARGIN = 100;
-export const GAPS_VW = 2;
+export const GAPS_VW = 1.25;
 export const SCREEN_WIDTH_VW = 100;
 export const SCREEN_HEIGHT_VH = 100;
 
@@ -14,9 +14,9 @@ export const SCREEN_HEIGHT_VH = 100;
  */
 export const TERMINAL_WIDTHS = {
   '1/3': 30,
-  '1/2': 48,
-  '2/3': 66,
-  '1': 80,
+  '1/2': 50,
+  '2/3': 69,
+  '1': 88,
 } as const;
 
 /**

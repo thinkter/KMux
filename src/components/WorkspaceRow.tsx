@@ -12,7 +12,7 @@ interface Props {
 
 export const WorkspaceRow: React.FC<Props> = ({ workspace, isActiveWorkspace }) => {
   const [viewOffset, setViewOffset] = useState(0);
-  const { theme } = useCanvasStore();
+  const { theme, isTerminalFullscreen } = useCanvasStore();
 
   /**
    * Cinematic Layout Logic (Infinite Strip / Sliding Window)
@@ -72,6 +72,12 @@ export const WorkspaceRow: React.FC<Props> = ({ workspace, isActiveWorkspace }) 
     }
   }, [workspace.activeTerminalIndex, workspace.terminals, viewOffset]);
 
+  const activeTerminal = workspace.terminals[workspace.activeTerminalIndex];
+  const visibleTerminals =
+    isActiveWorkspace && isTerminalFullscreen && activeTerminal
+      ? [activeTerminal]
+      : workspace.terminals;
+
   return (
     <div
       className={`w-screen h-screen flex-shrink-0 flex items-center transition-opacity duration-500 ${
@@ -104,14 +110,19 @@ export const WorkspaceRow: React.FC<Props> = ({ workspace, isActiveWorkspace }) 
       ) : (
         <div
           className="flex transition-transform duration-[800ms] ease-[cubic-bezier(0.25,1,0.5,1)]"
-          style={{ transform: `translateX(${-viewOffset}vw)` }}
+          style={{
+            transform:
+              isActiveWorkspace && isTerminalFullscreen ? 'translateX(0)' : `translateX(${-viewOffset}vw)`,
+            width: isActiveWorkspace && isTerminalFullscreen ? '100%' : undefined,
+            justifyContent: isActiveWorkspace && isTerminalFullscreen ? 'center' : undefined,
+          }}
         >
-          {workspace.terminals.map((term, index) => (
+          {visibleTerminals.map((term, index) => (
             <TerminalPanel
               key={term.id}
               terminal={term}
-              terminalIndex={index}
-              isActive={isActiveWorkspace && index === workspace.activeTerminalIndex}
+              terminalIndex={isActiveWorkspace && isTerminalFullscreen ? workspace.activeTerminalIndex : index}
+              isActive={isActiveWorkspace && term.id === activeTerminal?.id}
             />
           ))}
         </div>

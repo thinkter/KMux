@@ -17,9 +17,9 @@ interface Props {
 }
 
 export const TerminalPanel: React.FC<Props> = ({ terminal, terminalIndex, isActive }) => {
-  const { theme, isOverview } = useCanvasStore();
+  const { theme, isOverview, isTerminalFullscreen } = useCanvasStore();
   const { sessions } = useTerminalRuntime();
-  const w = getWidthVWString(terminal.widthFraction);
+  const w = isTerminalFullscreen && isActive ? '96vw' : getWidthVWString(terminal.widthFraction);
   const shellLabel = sessions[terminal.id]?.shell ?? 'Starting';
 
   // Opacity calculation based on activity and viewport mode
@@ -29,9 +29,9 @@ export const TerminalPanel: React.FC<Props> = ({ terminal, terminalIndex, isActi
     <div
       style={{
         width: w,
-        height: '82vh',
+        height: isTerminalFullscreen && isActive ? '94vh' : '86vh',
         flexShrink: 0,
-        margin: `0 ${GAPS_VW / 2}vw`,
+        margin: isTerminalFullscreen && isActive ? '0' : `0 ${GAPS_VW / 2}vw`,
         borderRadius: '18px',
         border: (isActive || isOverview) ? `1.5px solid ${theme.accent}${isActive ? '' : '40'}` : '1.5px solid transparent',
         background: theme.panelBg,

@@ -8,41 +8,15 @@ export type { Workspace, Terminal, WidthFraction };
 
 const createId = (): string => crypto.randomUUID();
 
-const DEFAULT_TERMINAL_TITLE = 'Terminal 1';
-
 const createWorkspaceTitle = (workspaces: Workspace[]): string => {
-  const takenNumbers = new Set(
-    workspaces
-      .map((workspace) => {
-        const match = /^Workspace (\d+)$/i.exec(workspace.title.trim());
-        return match ? Number.parseInt(match[1], 10) : null;
-      })
-      .filter((value): value is number => value !== null && Number.isInteger(value) && value > 0),
-  );
-
-  let nextNumber = 1;
-  while (takenNumbers.has(nextNumber)) {
-    nextNumber += 1;
-  }
-
-  return `Workspace ${nextNumber}`;
+  return `Workspace ${workspaces.length + 1}`;
 };
 
-const createWorkspace = (
-  workspaces: Workspace[],
-  profileId?: TerminalProfileId,
-): Workspace => {
+const createWorkspace = (workspaces: Workspace[]): Workspace => {
   return {
     id: createId(),
     title: createWorkspaceTitle(workspaces),
-    terminals: [
-      {
-        id: createId(),
-        title: DEFAULT_TERMINAL_TITLE,
-        widthFraction: '1',
-        profileId,
-      },
-    ],
+    terminals: [],
     activeTerminalIndex: 0,
   };
 };
@@ -54,6 +28,7 @@ export const useCanvasStore = create<CanvasState>()(
       activeWorkspaceIndex: 0,
       isOverview: false,
       isSearchOpen: false,
+      isTerminalFullscreen: false,
       theme: THEMES.standard,
 
       setTheme: (themeName: string) => {
@@ -90,15 +65,28 @@ export const useCanvasStore = create<CanvasState>()(
             workspaces: updatedWorkspaces,
             activeWorkspaceIndex: targetWsIndex,
             isSearchOpen: false,
+            isTerminalFullscreen: false,
           };
         });
+      },
+
+      jumpToWorkspace: (index: number) => {
+        set((state) => ({
+          activeWorkspaceIndex: Math.max(0, Math.min(index, state.workspaces.length - 1)),
+          isSearchOpen: false,
+          isTerminalFullscreen: false,
+        }));
       },
 
       moveWorkspace: (direction) => {
         set((state) => {
           const isAtBottom = state.activeWorkspaceIndex === state.workspaces.length - 1;
+          const activeWorkspace = state.workspaces[state.activeWorkspaceIndex];
 
           if (direction === 'down' && isAtBottom) {
+            if (!activeWorkspace || activeWorkspace.terminals.length === 0) {
+              return state;
+            }
             const newWorkspace = createWorkspace(state.workspaces);
             return {
               workspaces: [...state.workspaces, newWorkspace],
@@ -125,7 +113,7 @@ export const useCanvasStore = create<CanvasState>()(
             ...ws,
             activeTerminalIndex: targetIndex,
           };
-          return { workspaces: updatedWorkspaces };
+          return { workspaces: updatedWorkspaces, isTerminalFullscreen: false };
         });
       },
 
@@ -144,7 +132,7 @@ export const useCanvasStore = create<CanvasState>()(
             ...ws,
             activeTerminalIndex: newTerminalIndex,
           };
-          return { workspaces: updatedWorkspaces };
+          return { workspaces: updatedWorkspaces, isTerminalFullscreen: false };
         });
       },
 
@@ -192,14 +180,21 @@ export const useCanvasStore = create<CanvasState>()(
               newWSIndex = newWorkspaces.length - 1;
             }
 
+            // Final Re-index to ensure Workspace titles always match their visual order
+            const reindexedWorkspaces = newWorkspaces.map((ws, idx) => ({
+              ...ws,
+              title: `Workspace ${idx + 1}`
+            }));
+
             return {
-              workspaces: newWorkspaces,
+              workspaces: reindexedWorkspaces,
               activeWorkspaceIndex: newWSIndex,
+              isTerminalFullscreen: false,
             };
           }
 
           newWorkspaces[state.activeWorkspaceIndex] = currentWs;
-          return { workspaces: newWorkspaces };
+          return { workspaces: newWorkspaces, isTerminalFullscreen: false };
         });
       },
 
@@ -254,10 +249,10 @@ export const useCanvasStore = create<CanvasState>()(
         });
       },
 
-      addWorkspace: (profileId?: TerminalProfileId) => {
+      addWorkspace: () => {
         set((state) => {
           const newWorkspaces = [...state.workspaces];
-          newWorkspaces.push(createWorkspace(newWorkspaces, profileId));
+          newWorkspaces.push(createWorkspace(newWorkspaces));
 
           return {
             workspaces: newWorkspaces,
@@ -268,6 +263,13 @@ export const useCanvasStore = create<CanvasState>()(
 
       toggleOverview: () => {
         set((state) => ({ isOverview: !state.isOverview }));
+      },
+
+      toggleTerminalFullscreen: () => {
+        set((state) => ({
+          isTerminalFullscreen: !state.isTerminalFullscreen,
+          isOverview: false,
+        }));
       },
 
       cycleThemes: () => {

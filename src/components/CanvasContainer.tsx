@@ -78,14 +78,17 @@ export const CanvasContainer: React.FC = () => {
         {workspaces.map((_, index) => (
           <div
             key={index}
-            className="flex items-center justify-center rounded-md transition-all duration-700 text-[10px] font-mono"
+            className="flex items-center justify-center rounded-lg transition-all duration-700 text-[9px] font-mono font-bold"
             style={{
-              width: activeWorkspaceIndex === index ? '24px' : '18px',
-              height: activeWorkspaceIndex === index ? '24px' : '18px',
-              background: activeWorkspaceIndex === index ? `${theme.accent}22` : 'transparent',
-              border: `1px solid ${activeWorkspaceIndex === index ? `${theme.accent}66` : theme.border}`,
+              width: activeWorkspaceIndex === index ? '28px' : '20px',
+              height: activeWorkspaceIndex === index ? '28px' : '20px',
+              background: activeWorkspaceIndex === index ? `${theme.accent}15` : 'rgba(255,255,255,0.02)',
+              border: `1px solid ${activeWorkspaceIndex === index ? `${theme.accent}88` : theme.border}`,
               color: activeWorkspaceIndex === index ? theme.accent : theme.textDim,
-              opacity: activeWorkspaceIndex === index ? 1 : 0.65,
+              opacity: activeWorkspaceIndex === index ? 1 : 0.4,
+              boxShadow: activeWorkspaceIndex === index ? `0 4px 12px ${theme.accent}22` : 'none',
+              transform: activeWorkspaceIndex === index ? 'scale(1.1)' : 'scale(1)',
+              marginLeft: activeWorkspaceIndex === index ? '-4px' : '0'
             }}
           >
             {index + 1}
@@ -139,7 +142,7 @@ export const CanvasContainer: React.FC = () => {
           className="text-[10px] tracking-[0.5em] font-light uppercase"
           style={{ color: theme.text, fontFamily: 'JetBrains Mono, monospace' }}
         >
-          {workspaces[activeWorkspaceIndex]?.title || 'Workspace'}
+          {`WORKSPACE ${activeWorkspaceIndex + 1}`}
         </span>
       </div>
     </div>

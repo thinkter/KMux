@@ -46,12 +46,14 @@ export interface CanvasState {
   activeWorkspaceIndex: number;
   isOverview: boolean;
   isSearchOpen: boolean;
+  isTerminalFullscreen: boolean;
   theme: Theme;
 
   setTheme: (themeName: string) => void;
   cycleThemes: () => void;
   toggleSearch: () => void;
   jumpToGlobalTerminal: (terminalId: string) => void;
+  jumpToWorkspace: (index: number) => void;
   moveWorkspace: (direction: 'up' | 'down') => void;
   moveTerminal: (direction: 'left' | 'right') => void;
   jumpToTerminal: (index: number) => void;
@@ -61,4 +63,5 @@ export interface CanvasState {
   resizeTerminal: (direction: 'shrink' | 'expand') => void;
   cycleWidth: () => void;
   toggleOverview: () => void;
+  toggleTerminalFullscreen: () => void;
 }
