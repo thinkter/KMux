@@ -8,8 +8,26 @@
 import React from 'react';
 import { useKeyboardNav } from './hooks/useKeyboardNav';
 import { CanvasContainer } from './components/CanvasContainer';
+import { TerminalPickerModal } from './terminal/renderer/components/TerminalPickerModal';
+import { TerminalPickerProvider } from './terminal/renderer/context/TerminalPickerProvider';
+import { TerminalRuntimeProvider } from './terminal/renderer/context/TerminalRuntimeProvider';
+
+const AppContent: React.FC = () => {
+  useKeyboardNav();
+  return (
+    <>
+      <CanvasContainer />
+      <TerminalPickerModal />
+    </>
+  );
+};
 
 export default function App(): React.JSX.Element {
-  useKeyboardNav();
-  return <CanvasContainer />;
+  return (
+    <TerminalRuntimeProvider>
+      <TerminalPickerProvider>
+        <AppContent />
+      </TerminalPickerProvider>
+    </TerminalRuntimeProvider>
+  );
 }

@@ -1,59 +1,56 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import { v4 as uuidv4 } from 'uuid';
-import type { CanvasState, Workspace, Terminal, Theme, WidthFraction } from '../types/canvas-types';
+import type { TerminalProfileId } from '../terminal/shared/terminal-profiles';
+import type { CanvasState, Workspace, Terminal, WidthFraction } from '../types/canvas-types';
+import { THEMES, WIDTH_CYCLE } from '../lib/constants';
 
 export type { Workspace, Terminal, WidthFraction };
 
-const WIDTH_CYCLE: WidthFraction[] = ['1', '2/3', '1/2', '1/3'];
+const createId = (): string => crypto.randomUUID();
 
-const THEMES: Record<string, Theme> = {
-  standard: {
-    name: 'Standard',
-    bg: '#050302',
-    panelBg: 'rgba(22, 16, 13, 0.94)',
-    accent: '#ff6e3c',
-    text: '#e8dcc8',
-    textDim: 'rgba(232,220,200,0.3)',
-    border: 'rgba(232,220,200,0.08)',
-  },
-  midnight: {
-    name: 'Midnight Blue',
-    bg: '#020617',
-    panelBg: 'rgba(2,6,23,0.9)',
-    accent: '#38bdf8',
-    text: '#f8fafc',
-    textDim: 'rgba(248,250,252,0.4)',
-    border: 'rgba(248,250,252,0.1)',
-  },
-  dracula: {
-    name: 'Dracula',
-    bg: '#282a36',
-    panelBg: 'rgba(40,42,54,0.92)',
-    accent: '#bd93f9',
-    text: '#f8f8f2',
-    textDim: 'rgba(248,248,242,0.4)',
-    border: 'rgba(248,248,242,0.1)',
-  },
+const DEFAULT_TERMINAL_TITLE = 'Terminal 1';
+
+const createWorkspaceTitle = (workspaces: Workspace[]): string => {
+  const takenNumbers = new Set(
+    workspaces
+      .map((workspace) => {
+        const match = /^Workspace (\d+)$/i.exec(workspace.title.trim());
+        return match ? Number.parseInt(match[1], 10) : null;
+      })
+      .filter((value): value is number => value !== null && Number.isInteger(value) && value > 0),
+  );
+
+  let nextNumber = 1;
+  while (takenNumbers.has(nextNumber)) {
+    nextNumber += 1;
+  }
+
+  return `Workspace ${nextNumber}`;
+};
+
+const createWorkspace = (
+  workspaces: Workspace[],
+  profileId?: TerminalProfileId,
+): Workspace => {
+  return {
+    id: createId(),
+    title: createWorkspaceTitle(workspaces),
+    terminals: [
+      {
+        id: createId(),
+        title: DEFAULT_TERMINAL_TITLE,
+        widthFraction: '1',
+        profileId,
+      },
+    ],
+    activeTerminalIndex: 0,
+  };
 };
 
 export const useCanvasStore = create<CanvasState>()(
   persist(
     (set, get) => ({
-      workspaces: [
-        {
-          id: uuidv4(),
-          title: 'Workspace 1',
-          terminals: [
-            {
-              id: uuidv4(),
-              title: 'Terminal 1',
-              widthFraction: '1',
-            },
-          ],
-          activeTerminalIndex: 0,
-        },
-      ],
+      workspaces: [createWorkspace([])],
       activeWorkspaceIndex: 0,
       isOverview: false,
       isSearchOpen: false,
@@ -100,16 +97,9 @@ export const useCanvasStore = create<CanvasState>()(
       moveWorkspace: (direction) => {
         set((state) => {
           const isAtBottom = state.activeWorkspaceIndex === state.workspaces.length - 1;
-          
+
           if (direction === 'down' && isAtBottom) {
-            // Auto-create workspace if moving down at the bottom of the stack
-            const newWidth = state.workspaces.length + 1;
-            const newWorkspace: Workspace = {
-              id: uuidv4(),
-              title: `Workspace ${newWidth}`,
-              terminals: [{ id: uuidv4(), title: 'Terminal 1', widthFraction: '1' }],
-              activeTerminalIndex: 0,
-            };
+            const newWorkspace = createWorkspace(state.workspaces);
             return {
               workspaces: [...state.workspaces, newWorkspace],
               activeWorkspaceIndex: state.workspaces.length,
@@ -129,7 +119,7 @@ export const useCanvasStore = create<CanvasState>()(
           const ws = state.workspaces[state.activeWorkspaceIndex];
           if (!ws) return state;
           const targetIndex = Math.max(0, Math.min(index, ws.terminals.length - 1));
-          
+
           const updatedWorkspaces = [...state.workspaces];
           updatedWorkspaces[state.activeWorkspaceIndex] = {
             ...ws,
@@ -158,15 +148,16 @@ export const useCanvasStore = create<CanvasState>()(
         });
       },
 
-      addTerminal: () => {
+      addTerminal: (profileId?: TerminalProfileId) => {
         set((state) => {
           const ws = state.workspaces[state.activeWorkspaceIndex];
           if (!ws) return state;
 
           const newTerminal: Terminal = {
-            id: uuidv4(),
+            id: createId(),
             title: `Terminal ${ws.terminals.length + 1}`,
             widthFraction: '1',
+            profileId,
           };
           const updatedWorkspace: Workspace = {
             ...ws,
@@ -186,33 +177,24 @@ export const useCanvasStore = create<CanvasState>()(
 
           const newWorkspaces = [...state.workspaces];
           const currentWs = { ...ws, terminals: [...ws.terminals] };
-          
+
           currentWs.terminals.splice(currentWs.activeTerminalIndex, 1);
-          
-          // Fix out-of-bounds index for terminals
+
           if (currentWs.activeTerminalIndex >= currentWs.terminals.length) {
             currentWs.activeTerminalIndex = Math.max(0, currentWs.terminals.length - 1);
           }
 
-          // 🧹 AUTO-DESTROY: If workspace is now empty, remove it 
-          // (Unless it's the absolute last workspace, we keep it as a clean slate)
           if (currentWs.terminals.length === 0 && newWorkspaces.length > 1) {
             newWorkspaces.splice(state.activeWorkspaceIndex, 1);
-            
-            // 🔢 RE-INDEX: Ensure Workspace 1, 2, 3... stay in sequence
-            newWorkspaces.forEach((ws, idx) => {
-              ws.title = `Workspace ${idx + 1}`;
-            });
 
-            // Recalculate workspace index after destruction
             let newWSIndex = state.activeWorkspaceIndex;
             if (newWSIndex >= newWorkspaces.length) {
               newWSIndex = newWorkspaces.length - 1;
             }
-            
+
             return {
               workspaces: newWorkspaces,
-              activeWorkspaceIndex: newWSIndex
+              activeWorkspaceIndex: newWSIndex,
             };
           }
 
@@ -272,21 +254,14 @@ export const useCanvasStore = create<CanvasState>()(
         });
       },
 
-      addWorkspace: () => {
+      addWorkspace: (profileId?: TerminalProfileId) => {
         set((state) => {
           const newWorkspaces = [...state.workspaces];
-          newWorkspaces.push({
-            id: uuidv4(),
-            title: `Workspace ${newWorkspaces.length + 1}`,
-            terminals: [
-              { id: uuidv4(), title: 'Terminal 1', widthFraction: '1' }
-            ],
-            activeTerminalIndex: 0,
-          });
+          newWorkspaces.push(createWorkspace(newWorkspaces, profileId));
 
-          return { 
-            workspaces: newWorkspaces, 
-            activeWorkspaceIndex: newWorkspaces.length - 1 
+          return {
+            workspaces: newWorkspaces,
+            activeWorkspaceIndex: newWorkspaces.length - 1,
           };
         });
       },
@@ -299,7 +274,7 @@ export const useCanvasStore = create<CanvasState>()(
         const themeKeys = Object.keys(THEMES);
         const currentThemeName = get().theme.name;
         const currentIdx = themeKeys.indexOf(
-          themeKeys.find((k) => THEMES[k].name === currentThemeName) || 'standard'
+          themeKeys.find((k) => THEMES[k].name === currentThemeName) || 'standard',
         );
         const nextIdx = (currentIdx + 1) % themeKeys.length;
         set({ theme: THEMES[themeKeys[nextIdx]] });
@@ -308,7 +283,7 @@ export const useCanvasStore = create<CanvasState>()(
     {
       name: 'kmux-storage',
       storage: createJSONStorage(() => localStorage),
-      version: 2, // 🛡️ Automatically nuke stale "Ghost Workspaces" for the whole team
-    }
-  )
+      version: 3,
+    },
+  ),
 );

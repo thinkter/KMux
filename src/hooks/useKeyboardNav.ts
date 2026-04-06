@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { useCanvasStore } from '../store/useCanvasStore';
+import { useTerminalPicker } from '../terminal/renderer/context/use-terminal-picker';
 
 export const useKeyboardNav = () => {
   const {
@@ -15,17 +16,28 @@ export const useKeyboardNav = () => {
     cycleThemes,
     toggleSearch,
   } = useCanvasStore();
+  const { isOpen: isPickerOpen, openPicker } = useTerminalPicker();
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (isPickerOpen) {
+        return;
+      }
+
       // Intercept Meta (Cmd/Win) or Alt keys
       if (e.metaKey || e.altKey) {
         let handled = false;
         const key = e.key.toLowerCase();
 
-        // 1-9 for direct terminal jumping
-        if (/^[1-9]$/.test(key)) {
-          jumpToTerminal(parseInt(key) - 1);
+        if (e.altKey && e.shiftKey && key === 'enter') {
+          openPicker('terminal');
+          handled = true;
+        } else if (e.altKey && e.shiftKey && key === 'n') {
+          openPicker('workspace');
+          handled = true;
+        } else if (/^[1-9]$/.test(key)) {
+          // 1-9 for direct terminal jumping
+          jumpToTerminal(parseInt(key, 10) - 1);
           handled = true;
         } else {
           switch (key) {
@@ -115,6 +127,8 @@ export const useKeyboardNav = () => {
     cycleWidth,
     toggleOverview,
     cycleThemes,
-    toggleSearch
+    toggleSearch,
+    isPickerOpen,
+    openPicker,
   ]);
 };

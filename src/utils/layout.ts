@@ -1,20 +1,18 @@
-/**
- * Shared layout utilities for vertical and horizontal canvas positioning.
- */
+import { WidthFraction } from '../types/canvas-types';
+import { TERMINAL_WIDTHS } from '../lib/constants';
 
-export type WidthFraction = '1/3' | '1/2' | '2/3' | '1';
+/**
+ * Spatial Layout Helper Functions
+ * Maps logical width fractions to current viewport-relative design tokens.
+ */
 
 /**
  * Returns the width in Volkswagen (vw) units for a given terminal width fraction.
+ * Derived directly from the global design system tokens.
  */
 export const getWidthVW = (fraction: WidthFraction | undefined): number => {
-  switch (fraction) {
-    case '1/3': return 30;
-    case '1/2': return 48;
-    case '2/3': return 66;
-    case '1':   return 80;
-    default:    return 80;
-  }
+  if (!fraction) return TERMINAL_WIDTHS['1'];
+  return TERMINAL_WIDTHS[fraction] ?? TERMINAL_WIDTHS['1'];
 };
 
 /**
@@ -23,5 +21,3 @@ export const getWidthVW = (fraction: WidthFraction | undefined): number => {
 export const getWidthVWString = (fraction: WidthFraction | undefined): string => {
   return `${getWidthVW(fraction)}vw`;
 };
-
-export const GAPS_VW = 3; // Total horizontal spacing (margins) per terminal

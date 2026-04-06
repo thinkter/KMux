@@ -1,18 +1,33 @@
+import type { TerminalProfileId } from '../terminal/shared/terminal-profiles';
+
+/**
+ * Spatial Alignment Constants (vw)
+ */
 export type WidthFraction = '1/3' | '1/2' | '2/3' | '1';
 
+/**
+ * Unified Terminal Interface
+ */
 export interface Terminal {
   id: string;
   title: string;
-  widthFraction: WidthFraction; // Defined in layout.ts to return VW floats
+  profileId?: TerminalProfileId;
+  widthFraction: WidthFraction;
 }
 
+/**
+ * Unified Workspace Interface
+ */
 export interface Workspace {
   id: string;
   title: string;
   terminals: Terminal[];
-  activeTerminalIndex: number; // horizontal offset 0, 1, 2...
+  activeTerminalIndex: number;
 }
 
+/**
+ * Standard KMux Theme Definition
+ */
 export interface Theme {
   name: string;
   bg: string;
@@ -23,10 +38,13 @@ export interface Theme {
   border: string;
 }
 
+/**
+ * Global Canvas State Machine
+ */
 export interface CanvasState {
   workspaces: Workspace[];
-  activeWorkspaceIndex: number; // vertical offset 0, 1, 2...
-  isOverview: boolean;          // CanvasContainer uses this for scale(0.28) zoom-out
+  activeWorkspaceIndex: number;
+  isOverview: boolean;
   isSearchOpen: boolean;
   theme: Theme;
 
@@ -37,8 +55,8 @@ export interface CanvasState {
   moveWorkspace: (direction: 'up' | 'down') => void;
   moveTerminal: (direction: 'left' | 'right') => void;
   jumpToTerminal: (index: number) => void;
-  addTerminal: () => void;
-  addWorkspace: () => void;
+  addTerminal: (profileId?: TerminalProfileId) => void;
+  addWorkspace: (profileId?: TerminalProfileId) => void;
   removeTerminal: () => void;
   resizeTerminal: (direction: 'shrink' | 'expand') => void;
   cycleWidth: () => void;
