@@ -309,6 +309,10 @@ export const useCanvasStore = create<CanvasState>()(
 
       addWorkspace: () => {
         set((state) => {
+          const activeWorkspace = state.workspaces[state.activeWorkspaceIndex];
+          if (!activeWorkspace || activeWorkspace.terminals.length === 0) {
+            return state;
+          }
           if (state.workspaces.length >= MAX_WORKSPACES) {
             return state;
           }
