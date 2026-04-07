@@ -40,8 +40,8 @@ export const useKeyboardNav = () => {
         } else if (e.altKey && key === 'b') {
           toggleTerminalFullscreen();
           handled = true;
-        } else if (/^[1-9]$/.test(key)) {
-          jumpToWorkspace(parseInt(key, 10) - 1);
+        } else if (/^[0-9]$/.test(key)) {
+          jumpToWorkspace(key === '0' ? 9 : parseInt(key, 10) - 1);
           handled = true;
         } else {
           switch (key) {

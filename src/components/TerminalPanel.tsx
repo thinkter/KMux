@@ -1,7 +1,3 @@
-/**
- * TerminalPanel.tsx — Cinematic Render (Final Pass)
- */
-
 import React from 'react';
 import { useCanvasStore } from '../store/useCanvasStore';
 import type { Terminal } from '../types/canvas-types';
@@ -17,23 +13,28 @@ interface Props {
 }
 
 export const TerminalPanel: React.FC<Props> = ({ terminal, terminalIndex, isActive }) => {
-  const { theme, isOverview, isTerminalFullscreen } = useCanvasStore();
+  const { theme, isOverview, isTerminalFullscreen, jumpToGlobalTerminal } = useCanvasStore();
   const { sessions } = useTerminalRuntime();
   const w = isTerminalFullscreen && isActive ? '96vw' : getWidthVWString(terminal.widthFraction);
   const shellLabel = sessions[terminal.id]?.shell ?? 'Starting';
-
-  // Opacity calculation based on activity and viewport mode
   const displayOpacity = isOverview ? 1 : (isActive ? 1 : 0.9);
 
   return (
     <div
+      onMouseDown={() => {
+        if (!isActive) {
+          jumpToGlobalTerminal(terminal.id);
+        }
+      }}
       style={{
         width: w,
         height: isTerminalFullscreen && isActive ? '94vh' : '86vh',
         flexShrink: 0,
         margin: isTerminalFullscreen && isActive ? '0' : `0 ${GAPS_VW / 2}vw`,
         borderRadius: '18px',
-        border: (isActive || isOverview) ? `1.5px solid ${theme.accent}${isActive ? '' : '40'}` : '1.5px solid transparent',
+        border: (isActive || isOverview)
+          ? `1.5px solid ${theme.accent}${isActive ? '' : '40'}`
+          : '1.5px solid transparent',
         background: theme.panelBg,
         backdropFilter: (isActive || isOverview) ? 'blur(32px) saturate(160%)' : 'blur(10px)',
         transition: 'all 0.6s cubic-bezier(0.22, 1, 0.36, 1)',
@@ -45,7 +46,6 @@ export const TerminalPanel: React.FC<Props> = ({ terminal, terminalIndex, isActi
         boxShadow: isActive ? `inset 0 0 60px ${theme.accent}10` : 'none',
       }}
     >
-      {/* Title bar */}
       <div
         style={{
           padding: '10px 16px',
@@ -78,7 +78,6 @@ export const TerminalPanel: React.FC<Props> = ({ terminal, terminalIndex, isActi
         </div>
       </div>
 
-      {/* Live xterm viewport */}
       <div
         style={{
           flex: 1,

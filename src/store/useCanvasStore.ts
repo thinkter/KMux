@@ -7,6 +7,7 @@ import { THEMES, WIDTH_CYCLE } from '../lib/constants';
 export type { Workspace, Terminal, WidthFraction };
 
 const createId = (): string => crypto.randomUUID();
+const MAX_WORKSPACES = 10;
 
 const createWorkspaceTitle = (workspaces: Workspace[]): string => {
   return `Workspace ${workspaces.length + 1}`;
@@ -18,6 +19,39 @@ const createWorkspace = (workspaces: Workspace[]): Workspace => {
     title: createWorkspaceTitle(workspaces),
     terminals: [],
     activeTerminalIndex: 0,
+  };
+};
+
+const reindexWorkspaces = (workspaces: Workspace[]): Workspace[] => {
+  return workspaces.map((workspace, index) => ({
+    ...workspace,
+    title: `Workspace ${index + 1}`,
+  }));
+};
+
+const pruneEmptyWorkspaceOnLeave = (
+  workspaces: Workspace[],
+  activeWorkspaceIndex: number,
+  nextWorkspaceIndex: number,
+): { workspaces: Workspace[]; activeWorkspaceIndex: number } => {
+  if (activeWorkspaceIndex === nextWorkspaceIndex) {
+    return { workspaces, activeWorkspaceIndex };
+  }
+
+  const activeWorkspace = workspaces[activeWorkspaceIndex];
+  if (!activeWorkspace || activeWorkspace.terminals.length > 0 || workspaces.length <= 1) {
+    return { workspaces, activeWorkspaceIndex: nextWorkspaceIndex };
+  }
+
+  const updatedWorkspaces = [...workspaces];
+  updatedWorkspaces.splice(activeWorkspaceIndex, 1);
+
+  const adjustedIndex =
+    nextWorkspaceIndex > activeWorkspaceIndex ? nextWorkspaceIndex - 1 : nextWorkspaceIndex;
+
+  return {
+    workspaces: reindexWorkspaces(updatedWorkspaces),
+    activeWorkspaceIndex: Math.max(0, Math.min(adjustedIndex, updatedWorkspaces.length - 1)),
   };
 };
 
@@ -55,15 +89,21 @@ export const useCanvasStore = create<CanvasState>()(
 
           if (targetWsIndex === -1) return state;
 
-          const updatedWorkspaces = [...state.workspaces];
-          updatedWorkspaces[targetWsIndex] = {
-            ...state.workspaces[targetWsIndex],
+          const navigationState = pruneEmptyWorkspaceOnLeave(
+            state.workspaces,
+            state.activeWorkspaceIndex,
+            targetWsIndex,
+          );
+
+          const updatedWorkspaces = [...navigationState.workspaces];
+          updatedWorkspaces[navigationState.activeWorkspaceIndex] = {
+            ...updatedWorkspaces[navigationState.activeWorkspaceIndex],
             activeTerminalIndex: targetTermIndex,
           };
 
           return {
             workspaces: updatedWorkspaces,
-            activeWorkspaceIndex: targetWsIndex,
+            activeWorkspaceIndex: navigationState.activeWorkspaceIndex,
             isSearchOpen: false,
             isTerminalFullscreen: false,
           };
@@ -71,11 +111,21 @@ export const useCanvasStore = create<CanvasState>()(
       },
 
       jumpToWorkspace: (index: number) => {
-        set((state) => ({
-          activeWorkspaceIndex: Math.max(0, Math.min(index, state.workspaces.length - 1)),
-          isSearchOpen: false,
-          isTerminalFullscreen: false,
-        }));
+        set((state) => {
+          const targetIndex = Math.max(0, Math.min(index, state.workspaces.length - 1));
+          const navigationState = pruneEmptyWorkspaceOnLeave(
+            state.workspaces,
+            state.activeWorkspaceIndex,
+            targetIndex,
+          );
+
+          return {
+            workspaces: navigationState.workspaces,
+            activeWorkspaceIndex: navigationState.activeWorkspaceIndex,
+            isSearchOpen: false,
+            isTerminalFullscreen: false,
+          };
+        });
       },
 
       moveWorkspace: (direction) => {
@@ -84,7 +134,11 @@ export const useCanvasStore = create<CanvasState>()(
           const activeWorkspace = state.workspaces[state.activeWorkspaceIndex];
 
           if (direction === 'down' && isAtBottom) {
-            if (!activeWorkspace || activeWorkspace.terminals.length === 0) {
+            if (
+              !activeWorkspace ||
+              activeWorkspace.terminals.length === 0 ||
+              state.workspaces.length >= MAX_WORKSPACES
+            ) {
               return state;
             }
             const newWorkspace = createWorkspace(state.workspaces);
@@ -98,7 +152,16 @@ export const useCanvasStore = create<CanvasState>()(
             direction === 'up'
               ? Math.max(0, state.activeWorkspaceIndex - 1)
               : Math.min(state.workspaces.length - 1, state.activeWorkspaceIndex + 1);
-          return { activeWorkspaceIndex: newIndex };
+          const navigationState = pruneEmptyWorkspaceOnLeave(
+            state.workspaces,
+            state.activeWorkspaceIndex,
+            newIndex,
+          );
+          return {
+            workspaces: navigationState.workspaces,
+            activeWorkspaceIndex: navigationState.activeWorkspaceIndex,
+            isTerminalFullscreen: false,
+          };
         });
       },
 
@@ -181,13 +244,8 @@ export const useCanvasStore = create<CanvasState>()(
             }
 
             // Final Re-index to ensure Workspace titles always match their visual order
-            const reindexedWorkspaces = newWorkspaces.map((ws, idx) => ({
-              ...ws,
-              title: `Workspace ${idx + 1}`
-            }));
-
             return {
-              workspaces: reindexedWorkspaces,
+              workspaces: reindexWorkspaces(newWorkspaces),
               activeWorkspaceIndex: newWSIndex,
               isTerminalFullscreen: false,
             };
@@ -251,6 +309,9 @@ export const useCanvasStore = create<CanvasState>()(
 
       addWorkspace: () => {
         set((state) => {
+          if (state.workspaces.length >= MAX_WORKSPACES) {
+            return state;
+          }
           const newWorkspaces = [...state.workspaces];
           newWorkspaces.push(createWorkspace(newWorkspaces));
 

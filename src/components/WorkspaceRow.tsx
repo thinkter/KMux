@@ -13,6 +13,11 @@ interface Props {
 export const WorkspaceRow: React.FC<Props> = ({ workspace, isActiveWorkspace }) => {
   const [viewOffset, setViewOffset] = useState(0);
   const { theme, isTerminalFullscreen } = useCanvasStore();
+  const totalRowWidth = workspace.terminals.reduce(
+    (total, terminal) => total + getWidthVW(terminal.widthFraction) + GAPS_VW,
+    0,
+  );
+  const fitsOnScreen = totalRowWidth <= SCREEN_WIDTH_VW;
 
   /**
    * Cinematic Layout Logic (Infinite Strip / Sliding Window)
@@ -54,10 +59,6 @@ export const WorkspaceRow: React.FC<Props> = ({ workspace, isActiveWorkspace }) 
         targetOffset = activeRight - SCREEN_WIDTH_VW + CAMERA_PADDING;
       }
 
-      // Left-aligned clamping for small rows
-      let totalRowWidth = 0;
-      terminals.forEach(t => { totalRowWidth += getWidthVW(t.widthFraction) + GAPS_VW; });
-      
       if (totalRowWidth <= SCREEN_WIDTH_VW && !isLastTerminal) {
         targetOffset = 0;
       } else if (totalRowWidth > SCREEN_WIDTH_VW) {
@@ -112,9 +113,12 @@ export const WorkspaceRow: React.FC<Props> = ({ workspace, isActiveWorkspace }) 
           className="flex transition-transform duration-[800ms] ease-[cubic-bezier(0.25,1,0.5,1)]"
           style={{
             transform:
-              isActiveWorkspace && isTerminalFullscreen ? 'translateX(0)' : `translateX(${-viewOffset}vw)`,
-            width: isActiveWorkspace && isTerminalFullscreen ? '100%' : undefined,
-            justifyContent: isActiveWorkspace && isTerminalFullscreen ? 'center' : undefined,
+              isActiveWorkspace && (isTerminalFullscreen || fitsOnScreen)
+                ? 'translateX(0)'
+                : `translateX(${-viewOffset}vw)`,
+            width: isActiveWorkspace && (isTerminalFullscreen || fitsOnScreen) ? '100%' : undefined,
+            justifyContent:
+              isActiveWorkspace && (isTerminalFullscreen || fitsOnScreen) ? 'center' : undefined,
           }}
         >
           {visibleTerminals.map((term, index) => (

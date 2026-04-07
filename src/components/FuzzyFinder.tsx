@@ -1,24 +1,94 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useCanvasStore } from '../store/useCanvasStore';
 import { SEARCH_BOX_TOP, SEARCH_BOX_WIDTH, Z_LAYERS } from '../lib/constants';
+import { useTerminalRuntime } from '../terminal/renderer/context/useTerminalRuntime';
+
+const MAX_PREVIEW_BUFFER = 4000;
+// eslint-disable-next-line no-control-regex
+const ANSI_ESCAPE_REGEX = new RegExp('\\u001B\\[[0-9;?]*[ -/]*[@-~]', 'g');
+
+const stripAnsi = (value: string): string => value.replace(ANSI_ESCAPE_REGEX, '');
+
+const toPreview = (value: string): string => {
+  const cleaned = stripAnsi(value).replace(/\r/g, '');
+  const lines = cleaned
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+
+  return lines.at(-1) ?? '';
+};
+
+const getDisplayPath = (cwd: string | undefined): string => {
+  if (!cwd) {
+    return 'directory unavailable';
+  }
+
+  const normalized = cwd.replace(/\\/g, '/');
+  const segments = normalized.split('/').filter(Boolean);
+  if (segments.length <= 2) {
+    return cwd;
+  }
+
+  return `.../${segments.slice(-2).join('/')}`;
+};
 
 export const FuzzyFinder: React.FC = () => {
   const { workspaces, theme, isSearchOpen, toggleSearch, jumpToGlobalTerminal } = useCanvasStore();
+  const { sessions, registerOutputSink } = useTerminalRuntime();
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [previews, setPreviews] = useState<Record<string, string>>({});
+  const previewBuffersRef = useRef<Map<string, string>>(new Map());
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const terminalIds = useMemo(
+    () => workspaces.flatMap((workspace) => workspace.terminals.map((terminal) => terminal.id)),
+    [workspaces],
+  );
+
+  useEffect(() => {
+    if (!isSearchOpen) {
+      previewBuffersRef.current.clear();
+      setPreviews({});
+      return;
+    }
+
+    const detachHandlers = terminalIds.map((terminalId) =>
+      registerOutputSink(terminalId, (chunk) => {
+        const previousBuffer = previewBuffersRef.current.get(terminalId) ?? '';
+        const nextBuffer = `${previousBuffer}${chunk}`.slice(-MAX_PREVIEW_BUFFER);
+        previewBuffersRef.current.set(terminalId, nextBuffer);
+        setPreviews((current) => ({
+          ...current,
+          [terminalId]: toPreview(nextBuffer),
+        }));
+      }),
+    );
+
+    return () => {
+      detachHandlers.forEach((detach) => detach());
+    };
+  }, [isSearchOpen, registerOutputSink, terminalIds]);
 
   const allTerminals = workspaces.flatMap((workspace, wsIdx) =>
     workspace.terminals.map((terminal) => ({
       ...terminal,
       workspaceName: workspace.title,
+      shell: sessions[terminal.id]?.shell ?? 'starting',
+      cwd: sessions[terminal.id]?.cwd ?? '',
+      displayPath: getDisplayPath(sessions[terminal.id]?.cwd),
+      preview: previews[terminal.id] ?? '',
       wsIdx,
     })),
   );
 
   const filtered = allTerminals.filter((terminal) =>
     terminal.title.toLowerCase().includes(query.toLowerCase()) ||
-    terminal.workspaceName.toLowerCase().includes(query.toLowerCase()),
+    terminal.workspaceName.toLowerCase().includes(query.toLowerCase()) ||
+    terminal.shell.toLowerCase().includes(query.toLowerCase()) ||
+    terminal.cwd.toLowerCase().includes(query.toLowerCase()) ||
+    terminal.preview.toLowerCase().includes(query.toLowerCase()),
   );
 
   useEffect(() => {
@@ -158,8 +228,18 @@ export const FuzzyFinder: React.FC = () => {
                     className="text-[10px] opacity-40 truncate flex items-center gap-2 uppercase tracking-widest mt-0.5"
                     style={{ color: theme.text }}
                   >
-                    {terminal.workspaceName}
+                    <span>{terminal.workspaceName}</span>
+                    <span>{terminal.shell}</span>
+                    <span className="normal-case tracking-normal">{terminal.displayPath}</span>
                   </div>
+                  {terminal.preview ? (
+                    <div
+                      className="text-[10px] opacity-60 truncate mt-1 normal-case"
+                      style={{ color: theme.textDim }}
+                    >
+                      {terminal.preview}
+                    </div>
+                  ) : null}
                 </div>
 
                 {index === selectedIndex && (
