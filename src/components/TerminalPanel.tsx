@@ -5,22 +5,23 @@
 import React from 'react';
 import { useCanvasStore } from '../store/useCanvasStore';
 import type { Terminal } from '../types/canvas-types';
+import { TerminalViewport } from '../terminal/renderer/components/TerminalViewport';
+import { useTerminalRuntime } from '../terminal/renderer/context/useTerminalRuntime';
 import { getWidthVWString } from '../utils/layout';
 
 interface Props {
   terminal: Terminal;
+  terminalIndex: number;
   isActive: boolean;
 }
 
-export const TerminalPanel: React.FC<Props> = ({ terminal, isActive }) => {
-  const { theme, workspaces, activeWorkspaceIndex, isOverview } = useCanvasStore();
+export const TerminalPanel: React.FC<Props> = ({ terminal, terminalIndex, isActive }) => {
+  const { theme, isOverview } = useCanvasStore();
+  const { sessions } = useTerminalRuntime();
   const w = getWidthVWString(terminal.widthFraction);
+  const shellLabel = sessions[terminal.id]?.shell ?? 'Starting';
 
-  const currentWS = workspaces[activeWorkspaceIndex];
-  const totalCount = currentWS?.terminals.length || 0;
-  const currentIndex = currentWS?.terminals.findIndex(t => t.id === terminal.id) ?? 0;
-
-  // 💡 OVERVIEW LOGIC: In overview mode, everything should be fully bright (1).
+  // Overview logic: in overview mode, everything should be fully bright (1).
   // In regular mode, inactive terminals are "highly" visible (0.9).
   const displayOpacity = isOverview ? 1 : (isActive ? 1 : 0.9);
 
@@ -68,31 +69,23 @@ export const TerminalPanel: React.FC<Props> = ({ terminal, isActive }) => {
               fontSize: 10,
               color: isActive ? theme.accent : theme.textDim,
               letterSpacing: '0.15em',
-              textTransform: 'uppercase',
               fontWeight: 500,
               opacity: (isActive || isOverview) ? 1 : 0.5,
             }}
           >
-            {terminal.title}
+            {`TERMINAL ${terminalIndex + 1} - ${shellLabel}`}
           </span>
         </div>
       </div>
 
-      {/* Body placeholder */}
+      {/* Live xterm viewport */}
       <div
         style={{
           flex: 1,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          fontFamily: 'JetBrains Mono, monospace',
-          fontSize: 12,
-          color: theme.accent,
-          opacity: 0.1,
-          letterSpacing: '0.4em',
+          minHeight: 0,
         }}
       >
-        TERMINAL PLACEHOLDER
+        <TerminalViewport terminalId={terminal.id} isActive={isActive} />
       </div>
     </div>
   );

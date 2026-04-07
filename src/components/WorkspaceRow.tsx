@@ -89,6 +89,7 @@ export const WorkspaceRow: React.FC<Props> = ({ workspace, isActiveWorkspace }) 
             <TerminalPanel
               key={term.id}
               terminal={term}
+              terminalIndex={index}
               isActive={isActiveWorkspace && index === workspace.activeTerminalIndex}
             />
           ))}

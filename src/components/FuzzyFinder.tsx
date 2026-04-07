@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useCanvasStore } from '../store/useCanvasStore';
-import type { Terminal } from '../types/canvas-types';
 
 export const FuzzyFinder: React.FC = () => {
   const { workspaces, theme, isSearchOpen, toggleSearch, jumpToGlobalTerminal } = useCanvasStore();

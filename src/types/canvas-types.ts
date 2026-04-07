@@ -1,8 +1,10 @@
+import type { TerminalProfileId } from '../terminal/shared/terminal-profiles';
 export type WidthFraction = '1/3' | '1/2' | '2/3' | '1';
 
 export interface Terminal {
   id: string;
   title: string;
+  profileId?: TerminalProfileId;
   widthFraction: WidthFraction; // Defined in layout.ts to return VW floats
 }
 
@@ -37,8 +39,8 @@ export interface CanvasState {
   moveWorkspace: (direction: 'up' | 'down') => void;
   moveTerminal: (direction: 'left' | 'right') => void;
   jumpToTerminal: (index: number) => void;
-  addTerminal: () => void;
-  addWorkspace: () => void;
+  addTerminal: (profileId?: TerminalProfileId) => void;
+  addWorkspace: (profileId?: TerminalProfileId) => void;
   removeTerminal: () => void;
   resizeTerminal: (direction: 'shrink' | 'expand') => void;
   cycleWidth: () => void;

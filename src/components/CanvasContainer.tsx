@@ -9,12 +9,6 @@ export const CanvasContainer: React.FC = () => {
     activeWorkspaceIndex,
     isOverview,
     theme,
-    moveTerminal,
-    moveWorkspace,
-    addTerminal,
-    removeTerminal,
-    resizeTerminal,
-    toggleOverview,
   } = useCanvasStore();
 
   const [controlsVisible, setControlsVisible] = useState(true);
@@ -130,6 +124,8 @@ export const CanvasContainer: React.FC = () => {
           <p>arrows · focus terminal / workspace</p>
           <p>enter · new terminal</p>
           <p>n · new workspace</p>
+          <p>shift + alt + enter · choose terminal profile</p>
+          <p>shift + alt + n · choose workspace profile</p>
           <p>q/w · close terminal</p>
           <p>o · toggle overview</p>
           <p>f · fuzzy finder</p>
