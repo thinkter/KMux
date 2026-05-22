@@ -1,10 +1,10 @@
-import { parsePatchFiles } from '@pierre/diffs';
-import { CodeView, type CodeViewItem } from '@pierre/diffs/react';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { useCanvasStore } from '../store/useCanvasStore';
-import type { DiffPanel as DiffPanelItem } from '../types/canvas-types';
-import { GAPS_VW } from '../lib/constants';
-import { getWidthVWString } from '../utils/layout';
+import { parsePatchFiles } from "@pierre/diffs";
+import { CodeView, type CodeViewItem } from "@pierre/diffs/react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { useCanvasStore } from "../store/useCanvasStore";
+import type { DiffPanel as DiffPanelItem } from "../types/canvas-types";
+import { GAPS_VW } from "../lib/constants";
+import { getWidthVWString } from "../utils/layout";
 
 interface Props {
   panel: DiffPanelItem;
@@ -12,111 +12,81 @@ interface Props {
 }
 
 type DiffPanelState =
-  | { status: 'loading' }
-  | { status: 'ready'; items: CodeViewItem[] }
-  | { status: 'empty' }
-  | { status: 'error'; message: string };
+  | { status: "loading" }
+  | { status: "ready"; items: CodeViewItem[] }
+  | { status: "empty" }
+  | { status: "error"; message: string };
 
-type DiffViewMode = 'split' | 'stacked';
+type DiffViewMode = "split" | "stacked";
 
 const diffCache = new Map<string, { patch: string; items: CodeViewItem[] }>();
-const RESIZE_PLACEHOLDER_MS = 180;
 
 export const DiffPanel: React.FC<Props> = ({ panel, isActive }) => {
-  const theme = useCanvasStore((state) => state.theme);
-  const isTerminalFullscreen = useCanvasStore((state) => state.isTerminalFullscreen);
-  const focusWorkspaceItem = useCanvasStore((state) => state.focusWorkspaceItem);
+  const theme = useCanvasStore((s) => s.theme);
+  const isTerminalFullscreen = useCanvasStore((s) => s.isTerminalFullscreen);
+  const focusWorkspaceItem = useCanvasStore((s) => s.focusWorkspaceItem);
+  const diffFontSize = useCanvasStore(
+    (s) => s.diffFontSizes?.[panel.id] ?? s.diffFontSize,
+  );
 
   const cached = diffCache.get(panel.cwd);
   const [panelState, setPanelState] = useState<DiffPanelState>(
-    cached ? { status: 'ready', items: cached.items } : { status: 'loading' },
+    cached ? { status: "ready", items: cached.items } : { status: "loading" },
   );
   const [refreshKey, setRefreshKey] = useState(0);
-  const [isResizing, setIsResizing] = useState(false);
-  const [diffViewMode, setDiffViewMode] = useState<DiffViewMode>('split');
-  const lastRefresh = useRef(0);
-  const wasActive = useRef(isActive);
-  const previousWidthFraction = useRef(panel.widthFraction);
-  const resizeTimer = useRef<number | null>(null);
+  const [diffViewMode, setDiffViewMode] = useState<DiffViewMode>("split");
+
+  const lastRefreshRef = useRef(0);
+  const wasActiveRef = useRef(isActive);
 
   const refresh = useCallback((force = false) => {
     const now = Date.now();
-    if (!force && now - lastRefresh.current < 500) return;
-    lastRefresh.current = now;
-    setRefreshKey((key) => key + 1);
+    if (!force && now - lastRefreshRef.current < 500) return;
+    lastRefreshRef.current = now;
+    setRefreshKey((k) => k + 1);
   }, []);
 
+  // Refresh when panel becomes active
   useEffect(() => {
-    if (!wasActive.current && isActive) {
-      refresh(true);
-    }
-    wasActive.current = isActive;
+    if (!wasActiveRef.current && isActive) refresh(true);
+    wasActiveRef.current = isActive;
   }, [isActive, refresh]);
 
   useEffect(() => {
-    if (previousWidthFraction.current === panel.widthFraction) {
-      return;
-    }
-
-    previousWidthFraction.current = panel.widthFraction;
-    setIsResizing(true);
-
-    if (resizeTimer.current !== null) {
-      window.clearTimeout(resizeTimer.current);
-    }
-
-    resizeTimer.current = window.setTimeout(() => {
-      setIsResizing(false);
-      resizeTimer.current = null;
-    }, RESIZE_PLACEHOLDER_MS);
-  }, [panel.widthFraction]);
-
-  useEffect(() => {
-    return () => {
-      if (resizeTimer.current !== null) {
-        window.clearTimeout(resizeTimer.current);
-      }
-    };
-  }, []);
-
-  useEffect(() => {
     let cancelled = false;
-
-    if (!diffCache.has(panel.cwd)) {
-      setPanelState({ status: 'loading' });
-    }
+    if (!diffCache.has(panel.cwd)) setPanelState({ status: "loading" });
 
     void window.diffApi
       .getGitWorkingTreeDiff({ cwd: panel.cwd })
       .then((response) => {
         if (cancelled) return;
-
         if (!response.ok) {
           diffCache.delete(panel.cwd);
-          setPanelState({ status: 'error', message: response.message });
+          setPanelState({ status: "error", message: response.message });
           return;
         }
-
-        if (response.patch.trim().length === 0) {
+        if (!response.patch.trim()) {
           diffCache.delete(panel.cwd);
-          setPanelState({ status: 'empty' });
+          setPanelState({ status: "empty" });
           return;
         }
-
         try {
-          const items = parsePatchFiles(response.patch).flatMap((patch, patchIndex) =>
-            patch.files.map((fileDiff, fileIndex) => ({
-              id: `${patchIndex}:${fileIndex}:${fileDiff.name}`,
-              type: 'diff' as const,
+          const items = parsePatchFiles(response.patch).flatMap((patch, pi) =>
+            patch.files.map((fileDiff, fi) => ({
+              id: `${pi}:${fi}:${fileDiff.name}`,
+              type: "diff" as const,
               fileDiff,
             })),
           );
-          const nextState = items.length > 0 ? { status: 'ready' as const, items } : { status: 'empty' as const };
+          const nextState =
+            items.length > 0
+              ? { status: "ready" as const, items }
+              : { status: "empty" as const };
           diffCache.set(panel.cwd, { patch: response.patch, items });
           setPanelState(nextState);
         } catch (error) {
           setPanelState({
-            status: 'error',
+            status: "error",
             message: error instanceof Error ? error.message : String(error),
           });
         }
@@ -124,7 +94,7 @@ export const DiffPanel: React.FC<Props> = ({ panel, isActive }) => {
       .catch((error: unknown) => {
         if (cancelled) return;
         setPanelState({
-          status: 'error',
+          status: "error",
           message: error instanceof Error ? error.message : String(error),
         });
       });
@@ -134,76 +104,63 @@ export const DiffPanel: React.FC<Props> = ({ panel, isActive }) => {
     };
   }, [panel.cwd, refreshKey]);
 
-  const widthFractionChanged = previousWidthFraction.current !== panel.widthFraction;
-  const shouldShowResizePlaceholder =
-    panelState.status === 'ready' && (isResizing || widthFractionChanged);
-
   const width =
-    isTerminalFullscreen && isActive ? '96vw' : getWidthVWString(panel.widthFraction);
+    isTerminalFullscreen && isActive
+      ? "96vw"
+      : getWidthVWString(panel.widthFraction);
+
+  const diffLineHeight = Math.round(diffFontSize * 1.67);
 
   return (
     <section
       onMouseDown={() => {
-        if (!isActive) {
-          focusWorkspaceItem(panel.id);
-        }
+        if (!isActive) focusWorkspaceItem(panel.id);
       }}
+      className="diff-panel-section"
       style={{
         width,
-        height: isTerminalFullscreen && isActive ? '99vh' : '96vh',
-        flexShrink: 0,
-        margin: isTerminalFullscreen && isActive ? '0' : `0 ${GAPS_VW / 2}vw`,
+        height: isTerminalFullscreen && isActive ? "99vh" : "96vh",
+        margin: isTerminalFullscreen && isActive ? "0" : `0 ${GAPS_VW / 2}vw`,
         background: theme.panelBg,
-        transition:
-          'width 150ms cubic-bezier(0.22, 1, 0.36, 1), height 150ms cubic-bezier(0.22, 1, 0.36, 1), margin 150ms cubic-bezier(0.22, 1, 0.36, 1), opacity 150ms cubic-bezier(0.22, 1, 0.36, 1), background-color 150ms cubic-bezier(0.22, 1, 0.36, 1)',
         opacity: isActive ? 1 : 0.9,
-        display: 'flex',
-        flexDirection: 'column',
-        overflow: 'hidden',
-        position: 'relative',
       }}
     >
       <div className="diff-panel-scroll flex-1 min-h-0 overflow-auto px-3 py-3">
-        {panelState.status === 'loading' ? (
+        <DiffViewModeControl
+          mode={diffViewMode}
+          onModeChange={setDiffViewMode}
+          accent={theme.accent}
+          border={theme.border}
+          panelBg={theme.panelBg}
+          textDim={theme.textDim}
+        />
+        {panelState.status === "loading" ? (
           <DiffPanelMessage label="loading diff" color={theme.textDim} />
-        ) : panelState.status === 'error' ? (
+        ) : panelState.status === "error" ? (
           <DiffPanelMessage label={panelState.message} color={theme.accent} />
-        ) : panelState.status === 'empty' ? (
-          <DiffPanelMessage label="no changes against HEAD" color={theme.textDim} />
+        ) : panelState.status === "empty" ? (
+          <DiffPanelMessage
+            label="no changes against HEAD"
+            color={theme.textDim}
+          />
         ) : (
           <div className="relative min-h-full">
-            <DiffViewModeControl
-              mode={diffViewMode}
-              onModeChange={setDiffViewMode}
-              accent={theme.accent}
-              border={theme.border}
-              panelBg={theme.panelBg}
-              textDim={theme.textDim}
-            />
-            {shouldShowResizePlaceholder ? (
-              <div className="absolute inset-0 z-10">
-                <DiffPanelMessage label="resizing diff" color={theme.textDim} />
-              </div>
-            ) : null}
             <div
-              aria-hidden={shouldShowResizePlaceholder}
               style={{
-                contentVisibility: shouldShowResizePlaceholder ? 'hidden' : 'visible',
-                containIntrinsicSize: shouldShowResizePlaceholder ? '1200px' : undefined,
-                pointerEvents: shouldShowResizePlaceholder ? 'none' : undefined,
+                width: "100%",
+                fontFamily: "JetBrains Mono, monospace",
+                fontSize: `${diffFontSize}px`,
+                lineHeight: `${diffLineHeight}px`,
               }}
             >
               <CodeView
                 items={panelState.items}
                 options={{
-                  theme: 'pierre-dark',
-                  diffStyle: diffViewMode === 'split' ? 'split' : 'unified',
+                  theme: "pierre-dark",
+                  diffStyle: diffViewMode === "split" ? "split" : "unified",
                   disableBackground: true,
-                  lineDiffType: 'word',
-                }}
-                style={{
-                  fontFamily: 'JetBrains Mono, monospace',
-                  fontSize: '12px',
+                  lineDiffType: "word",
+                  itemMetrics: { lineHeight: diffLineHeight },
                 }}
               />
             </div>
@@ -230,54 +187,52 @@ const DiffViewModeControl: React.FC<DiffViewModeControlProps> = ({
   border,
   panelBg,
   textDim,
-}) => {
-  return (
-    <div
-      className="absolute right-2 top-2 z-20 flex overflow-hidden border"
-      style={{
-        background: panelBg,
-        borderColor: border,
-        fontFamily: 'JetBrains Mono, monospace',
-      }}
-      onMouseDown={(event) => event.stopPropagation()}
-    >
-      {(['split', 'stacked'] as const).map((viewMode) => {
-        const isSelected = mode === viewMode;
+}) => (
+  <div
+    className="absolute right-2 top-2 z-20 flex overflow-hidden border"
+    style={{
+      background: panelBg,
+      borderColor: border,
+      fontFamily: "JetBrains Mono, monospace",
+    }}
+    onMouseDown={(e) => e.stopPropagation()}
+  >
+    {(["split", "stacked"] as const).map((viewMode) => {
+      const selected = mode === viewMode;
+      return (
+        <button
+          key={viewMode}
+          type="button"
+          onClick={() => onModeChange(viewMode)}
+          className="px-2 py-1 uppercase"
+          style={{
+            background: selected ? accent : "transparent",
+            border: 0,
+            color: selected ? "#050302" : textDim,
+            fontSize: "10px",
+            letterSpacing: "0.08em",
+          }}
+        >
+          {viewMode}
+        </button>
+      );
+    })}
+  </div>
+);
 
-        return (
-          <button
-            key={viewMode}
-            type="button"
-            onClick={() => onModeChange(viewMode)}
-            className="px-2 py-1 uppercase"
-            style={{
-              background: isSelected ? accent : 'transparent',
-              border: 0,
-              color: isSelected ? '#050302' : textDim,
-              fontSize: '10px',
-              letterSpacing: '0.08em',
-            }}
-          >
-            {viewMode}
-          </button>
-        );
-      })}
-    </div>
-  );
-};
-
-const DiffPanelMessage: React.FC<{ label: string; color: string }> = ({ label, color }) => {
-  return (
-    <div
-      className="h-full flex items-center justify-center text-center px-6"
-      style={{
-        color,
-        fontFamily: 'JetBrains Mono, monospace',
-        fontSize: '11px',
-        letterSpacing: '0.08em',
-      }}
-    >
-      {label}
-    </div>
-  );
-};
+const DiffPanelMessage: React.FC<{ label: string; color: string }> = ({
+  label,
+  color,
+}) => (
+  <div
+    className="h-full flex items-center justify-center text-center px-6"
+    style={{
+      color,
+      fontFamily: "JetBrains Mono, monospace",
+      fontSize: "11px",
+      letterSpacing: "0.08em",
+    }}
+  >
+    {label}
+  </div>
+);

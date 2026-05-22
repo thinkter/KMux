@@ -10,8 +10,12 @@ import type {
   WorkspaceItem,
 } from '../types/canvas-types';
 import {
+  DEFAULT_DIFF_FONT_SIZE,
   DEFAULT_TERMINAL_FONT_SIZE,
+  DIFF_FONT_SIZE_STEP,
+  MAX_DIFF_FONT_SIZE,
   MAX_TERMINAL_FONT_SIZE,
+  MIN_DIFF_FONT_SIZE,
   MIN_TERMINAL_FONT_SIZE,
   TERMINAL_FONT_SIZE_STEP,
   THEMES,
@@ -31,10 +35,20 @@ const clampTerminalFontSize = (value: number): number => {
   return Math.min(MAX_TERMINAL_FONT_SIZE, Math.max(MIN_TERMINAL_FONT_SIZE, value));
 };
 
+const clampDiffFontSize = (value: number): number => {
+  return Math.min(MAX_DIFF_FONT_SIZE, Math.max(MIN_DIFF_FONT_SIZE, value));
+};
+
 const getActiveTerminal = (state: CanvasState): Terminal | undefined => {
   const workspace = state.workspaces[state.activeWorkspaceIndex];
   const activeItem = workspace?.items[workspace.activeItemIndex];
   return activeItem?.type === 'terminal' ? activeItem : undefined;
+};
+
+const getActiveDiffPanel = (state: CanvasState): DiffPanel | undefined => {
+  const workspace = state.workspaces[state.activeWorkspaceIndex];
+  const activeItem = workspace?.items[workspace.activeItemIndex];
+  return activeItem?.type === 'diff' ? activeItem : undefined;
 };
 
 const getTerminalItems = (workspace: Workspace): Terminal[] => {
@@ -166,6 +180,20 @@ const migratePersistedState = (persistedState: unknown): CanvasState | unknown =
   return {
     ...persistedState,
     workspaces: workspaces.length > 0 ? reindexWorkspaces(workspaces) : [createWorkspace([])],
+    diffFontSize:
+      typeof persistedState.diffFontSize === 'number'
+        ? clampDiffFontSize(persistedState.diffFontSize)
+        : DEFAULT_DIFF_FONT_SIZE,
+    diffFontSizes: isRecord(persistedState.diffFontSizes)
+      ? Object.fromEntries(
+          Object.entries(persistedState.diffFontSizes)
+            .filter((entry): entry is [string, number] => typeof entry[1] === 'number')
+            .map(([diffPanelId, fontSize]) => [
+              diffPanelId,
+              clampDiffFontSize(fontSize),
+            ]),
+        )
+      : {},
   };
 };
 
@@ -179,6 +207,8 @@ export const useCanvasStore = create<CanvasState>()(
       isTerminalFullscreen: false,
       terminalFontSize: DEFAULT_TERMINAL_FONT_SIZE,
       terminalFontSizes: {},
+      diffFontSize: DEFAULT_DIFF_FONT_SIZE,
+      diffFontSizes: {},
       theme: THEMES.standard,
 
       setTheme: (themeName: string) => {
@@ -426,6 +456,12 @@ export const useCanvasStore = create<CanvasState>()(
                     removedItem?.type !== 'terminal' || terminalId !== removedItem.id,
                 ),
               ),
+              diffFontSizes: Object.fromEntries(
+                Object.entries(state.diffFontSizes).filter(
+                  ([diffPanelId]) =>
+                    removedItem?.type !== 'diff' || diffPanelId !== removedItem.id,
+                ),
+              ),
               activeWorkspaceIndex: newWSIndex,
               isTerminalFullscreen: false,
             };
@@ -438,6 +474,12 @@ export const useCanvasStore = create<CanvasState>()(
               Object.entries(state.terminalFontSizes).filter(
                 ([terminalId]) =>
                   removedItem?.type !== 'terminal' || terminalId !== removedItem.id,
+              ),
+            ),
+            diffFontSizes: Object.fromEntries(
+              Object.entries(state.diffFontSizes).filter(
+                ([diffPanelId]) =>
+                  removedItem?.type !== 'diff' || diffPanelId !== removedItem.id,
               ),
             ),
             isTerminalFullscreen: false,
@@ -532,6 +574,29 @@ export const useCanvasStore = create<CanvasState>()(
         });
       },
 
+      adjustActiveDiffFontSize: (direction) => {
+        set((state) => {
+          const activeDiffPanel = getActiveDiffPanel(state);
+          if (!activeDiffPanel) {
+            return state;
+          }
+
+          const delta = direction === 'increase' ? DIFF_FONT_SIZE_STEP : -DIFF_FONT_SIZE_STEP;
+          const diffFontSizes = state.diffFontSizes ?? {};
+          const currentFontSize =
+            diffFontSizes[activeDiffPanel.id] ??
+            state.diffFontSize ??
+            DEFAULT_DIFF_FONT_SIZE;
+
+          return {
+            diffFontSizes: {
+              ...diffFontSizes,
+              [activeDiffPanel.id]: clampDiffFontSize(currentFontSize + delta),
+            },
+          };
+        });
+      },
+
       addWorkspace: () => {
         set((state) => {
           const activeWorkspace = state.workspaces[state.activeWorkspaceIndex];
@@ -575,7 +640,7 @@ export const useCanvasStore = create<CanvasState>()(
     {
       name: 'kmux-storage',
       storage: createJSONStorage(() => localStorage),
-      version: 4,
+      version: 5,
       migrate: migratePersistedState,
     },
   ),

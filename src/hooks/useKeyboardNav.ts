@@ -15,6 +15,7 @@ export const useKeyboardNav = () => {
     resizeTerminal,
     adjustActiveTerminalFontSize,
     adjustGlobalTerminalFontSize,
+    adjustActiveDiffFontSize,
     cycleWidth,
     toggleOverview,
     toggleTerminalFullscreen,
@@ -35,16 +36,22 @@ export const useKeyboardNav = () => {
       if (e.ctrlKey && !e.metaKey && !e.altKey) {
         const key = e.key.toLowerCase();
         let handled = false;
+        const workspace = workspaces[activeWorkspaceIndex];
+        const activeItem = workspace?.items[workspace.activeItemIndex];
 
         if (key === '+' || key === '=') {
-          if (e.shiftKey) {
+          if (activeItem?.type === 'diff') {
+            adjustActiveDiffFontSize('increase');
+          } else if (e.shiftKey) {
             adjustGlobalTerminalFontSize('increase');
           } else {
             adjustActiveTerminalFontSize('increase');
           }
           handled = true;
         } else if (key === '-' || key === '_') {
-          if (e.shiftKey) {
+          if (activeItem?.type === 'diff') {
+            adjustActiveDiffFontSize('decrease');
+          } else if (e.shiftKey) {
             adjustGlobalTerminalFontSize('decrease');
           } else {
             adjustActiveTerminalFontSize('decrease');
@@ -181,6 +188,7 @@ export const useKeyboardNav = () => {
     resizeTerminal,
     adjustActiveTerminalFontSize,
     adjustGlobalTerminalFontSize,
+    adjustActiveDiffFontSize,
     cycleWidth,
     toggleOverview,
     toggleTerminalFullscreen,

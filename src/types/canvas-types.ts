@@ -63,6 +63,8 @@ export interface CanvasState {
   isTerminalFullscreen: boolean;
   terminalFontSize: number;
   terminalFontSizes: Record<string, number>;
+  diffFontSize: number;
+  diffFontSizes: Record<string, number>;
   theme: Theme;
 
   setTheme: (themeName: string) => void;
@@ -81,6 +83,7 @@ export interface CanvasState {
   resizeTerminal: (direction: 'shrink' | 'expand') => void;
   adjustActiveTerminalFontSize: (direction: 'decrease' | 'increase') => void;
   adjustGlobalTerminalFontSize: (direction: 'decrease' | 'increase') => void;
+  adjustActiveDiffFontSize: (direction: 'decrease' | 'increase') => void;
   cycleWidth: () => void;
   toggleOverview: () => void;
   toggleTerminalFullscreen: () => void;
