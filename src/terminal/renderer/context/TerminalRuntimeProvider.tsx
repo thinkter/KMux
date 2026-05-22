@@ -68,14 +68,21 @@ const toErrorMessage = (error: unknown): string => {
 export const TerminalRuntimeProvider: React.FC<React.PropsWithChildren> = ({ children }) => {
   const workspaces = useCanvasStore((state) => state.workspaces);
   const terminalIds = useMemo(
-    () => workspaces.flatMap((workspace) => workspace.terminals.map((terminal) => terminal.id)),
+    () =>
+      workspaces.flatMap((workspace) =>
+        workspace.items
+          .filter((item) => item.type === 'terminal')
+          .map((terminal) => terminal.id),
+      ),
     [workspaces],
   );
   const terminalProfileById = useMemo<Record<string, TerminalProfileId | undefined>>(() => {
     const profileMap: Record<string, TerminalProfileId | undefined> = {};
     for (const workspace of workspaces) {
-      for (const terminal of workspace.terminals) {
-        profileMap[terminal.id] = terminal.profileId;
+      for (const item of workspace.items) {
+        if (item.type === 'terminal') {
+          profileMap[item.id] = item.profileId;
+        }
       }
     }
     return profileMap;

@@ -35,11 +35,13 @@ export const FuzzyFinder: React.FC = () => {
   const inputRef = useRef<HTMLInputElement>(null);
 
   const allTerminals = workspaces.flatMap((ws, wsIdx) =>
-    ws.terminals.map((t) => ({
-      ...t,
-      workspaceName: `ws ${wsIdx + 1}`,
-      wsIdx,
-    })),
+    ws.items
+      .filter((item) => item.type === "terminal")
+      .map((t) => ({
+        ...t,
+        workspaceName: `ws ${wsIdx + 1}`,
+        wsIdx,
+      })),
   );
 
   const filtered = allTerminals.filter((t) => {
@@ -163,10 +165,11 @@ export const FuzzyFinder: React.FC = () => {
                     height: "30px",
                     background:
                       i === selectedIndex ? `${theme.accent}18` : "transparent",
-                    borderLeft:
+                    outline:
                       i === selectedIndex
-                        ? `2px solid ${theme.accent}`
-                        : "2px solid transparent",
+                        ? `1px solid ${theme.accent}`
+                        : "1px solid transparent",
+                    outlineOffset: "-1px",
                   }}
                   onClick={() => jumpToGlobalTerminal(t.id)}
                   onMouseEnter={() => setSelectedIndex(i)}

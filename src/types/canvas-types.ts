@@ -6,14 +6,28 @@ import type { TerminalProfileId } from '../terminal/shared/terminal-profiles';
 export type WidthFraction = '1/3' | '1/2' | '2/3' | '1';
 
 /**
- * Unified Terminal Interface
+ * Unified Workspace Item Interfaces
  */
-export interface Terminal {
+export interface TerminalPanelItem {
   id: string;
+  type: 'terminal';
   title: string;
   profileId?: TerminalProfileId;
   widthFraction: WidthFraction;
 }
+
+export interface DiffPanelItem {
+  id: string;
+  type: 'diff';
+  title: string;
+  cwd: string;
+  sourceTerminalId?: string;
+  widthFraction: WidthFraction;
+}
+
+export type Terminal = TerminalPanelItem;
+export type DiffPanel = DiffPanelItem;
+export type WorkspaceItem = TerminalPanelItem | DiffPanelItem;
 
 /**
  * Unified Workspace Interface
@@ -21,8 +35,8 @@ export interface Terminal {
 export interface Workspace {
   id: string;
   title: string;
-  terminals: Terminal[];
-  activeTerminalIndex: number;
+  items: WorkspaceItem[];
+  activeItemIndex: number;
 }
 
 /**
@@ -47,26 +61,29 @@ export interface CanvasState {
   isOverview: boolean;
   isSearchOpen: boolean;
   isTerminalFullscreen: boolean;
-  isControlsOpen: boolean;
   terminalFontSize: number;
   terminalFontSizes: Record<string, number>;
+  diffFontSize: number;
+  diffFontSizes: Record<string, number>;
   theme: Theme;
 
   setTheme: (themeName: string) => void;
   cycleThemes: () => void;
   toggleSearch: () => void;
-  toggleControls: () => void;
+  focusWorkspaceItem: (itemId: string) => void;
   jumpToGlobalTerminal: (terminalId: string) => void;
   jumpToWorkspace: (index: number) => void;
   moveWorkspace: (direction: 'up' | 'down') => void;
   moveTerminal: (direction: 'left' | 'right') => void;
   jumpToTerminal: (index: number) => void;
   addTerminal: (profileId?: TerminalProfileId) => void;
+  addDiffPanel: (cwd: string, sourceTerminalId?: string) => void;
   addWorkspace: (profileId?: TerminalProfileId) => void;
   removeTerminal: () => void;
   resizeTerminal: (direction: 'shrink' | 'expand') => void;
   adjustActiveTerminalFontSize: (direction: 'decrease' | 'increase') => void;
   adjustGlobalTerminalFontSize: (direction: 'decrease' | 'increase') => void;
+  adjustActiveDiffFontSize: (direction: 'decrease' | 'increase') => void;
   cycleWidth: () => void;
   toggleOverview: () => void;
   toggleTerminalFullscreen: () => void;

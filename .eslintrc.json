@@ -19,5 +19,13 @@
     "ecmaFeatures": {
       "jsx": true
     }
+  },
+  "rules": {
+    "import/no-unresolved": [
+      "error",
+      {
+        "ignore": ["^@pierre/diffs$", "^@pierre/diffs/react$"]
+      }
+    ]
   }
 }
