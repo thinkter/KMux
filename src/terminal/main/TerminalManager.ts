@@ -42,6 +42,11 @@ const getErrorMessage = (error: unknown): string => {
   return String(error);
 };
 
+const getForegroundProcess = (ptyProcess: IPty): string | undefined => {
+  const processName = ptyProcess.process?.trim();
+  return processName && processName.length > 0 ? processName : undefined;
+};
+
 export class TerminalManager {
   private readonly sessions = new Map<string, TerminalSessionRecord>();
   private readonly events = new EventEmitter();
@@ -81,6 +86,7 @@ export class TerminalManager {
       pid: ptyProcess.pid,
       profileId: request.profileId,
       shell: shell.label,
+      foregroundProcess: getForegroundProcess(ptyProcess),
       cwd,
       cols,
       rows,
@@ -93,6 +99,7 @@ export class TerminalManager {
     });
 
     ptyProcess.onData((data) => {
+      this.refreshForegroundProcess(request.terminalId);
       this.events.emit(TERMINAL_EVENT_NAMES.output, {
         terminalId: request.terminalId,
         data,
@@ -162,6 +169,9 @@ export class TerminalManager {
   }
 
   public listTerminals(): TerminalSessionSnapshot[] {
+    for (const terminalId of this.sessions.keys()) {
+      this.refreshForegroundProcess(terminalId);
+    }
     return [...this.sessions.values()].map((session) => ({ ...session.snapshot }));
   }
 
@@ -194,5 +204,23 @@ export class TerminalManager {
       terminalId: snapshot.terminalId,
       snapshot: { ...snapshot },
     } satisfies TerminalStateEvent);
+  }
+
+  private refreshForegroundProcess(terminalId: string): void {
+    const session = this.sessions.get(terminalId);
+    if (!session) {
+      return;
+    }
+
+    const foregroundProcess = getForegroundProcess(session.pty);
+    if (foregroundProcess === session.snapshot.foregroundProcess) {
+      return;
+    }
+
+    session.snapshot = {
+      ...session.snapshot,
+      foregroundProcess,
+    };
+    this.emitState(session.snapshot);
   }
 }

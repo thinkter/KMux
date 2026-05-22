@@ -8,6 +8,7 @@ export interface TerminalSessionSnapshot {
   pid: number | null;
   profileId?: TerminalProfileId;
   shell: string;
+  foregroundProcess?: string;
   cwd: string;
   cols: number;
   rows: number;
