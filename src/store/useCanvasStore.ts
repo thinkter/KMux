@@ -227,16 +227,21 @@ export const useCanvasStore = create<CanvasState>()(
           const ws = state.workspaces[state.activeWorkspaceIndex];
           if (!ws) return state;
 
+          const insertIndex =
+            ws.terminals.length === 0 ? 0 : Math.min(ws.activeTerminalIndex + 1, ws.terminals.length);
           const newTerminal: Terminal = {
             id: createId(),
             title: `Terminal ${ws.terminals.length + 1}`,
             widthFraction: '2/3',
             profileId,
           };
+          const updatedTerminals = [...ws.terminals];
+          updatedTerminals.splice(insertIndex, 0, newTerminal);
+
           const updatedWorkspace: Workspace = {
             ...ws,
-            terminals: [...ws.terminals, newTerminal],
-            activeTerminalIndex: ws.terminals.length,
+            terminals: updatedTerminals,
+            activeTerminalIndex: insertIndex,
           };
           const updatedWorkspaces = [...state.workspaces];
           updatedWorkspaces[state.activeWorkspaceIndex] = updatedWorkspace;
