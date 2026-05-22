@@ -93,7 +93,7 @@ export const CanvasContainer: React.FC = () => {
       >
         {workspaces.map((workspace, index) => {
           const isActive = activeWorkspaceIndex === index;
-          if (!isActive && workspace.terminals.length === 0) {
+          if (!isActive && workspace.items.length === 0) {
             return null;
           }
 
@@ -156,7 +156,8 @@ export const CanvasContainer: React.FC = () => {
           <p>n - new workspace</p>
           <p>shift + alt + enter - choose terminal profile</p>
           <p>shift + alt + n - choose workspace profile</p>
-          <p>q/w - close terminal</p>
+          <p>alt + c - open git diff panel</p>
+          <p>q/w - close active panel</p>
           <p>o - toggle overview</p>
           <p>f - fuzzy finder</p>
           <p>-/= - resize width</p>

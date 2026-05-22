@@ -1,7 +1,14 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import type { TerminalProfileId } from '../terminal/shared/terminal-profiles';
-import type { CanvasState, Workspace, Terminal, WidthFraction } from '../types/canvas-types';
+import type {
+  CanvasState,
+  DiffPanel,
+  Terminal,
+  WidthFraction,
+  Workspace,
+  WorkspaceItem,
+} from '../types/canvas-types';
 import {
   DEFAULT_TERMINAL_FONT_SIZE,
   MAX_TERMINAL_FONT_SIZE,
@@ -11,7 +18,7 @@ import {
   WIDTH_CYCLE,
 } from '../lib/constants';
 
-export type { Workspace, Terminal, WidthFraction };
+export type { DiffPanel, Terminal, WidthFraction, Workspace, WorkspaceItem };
 
 const createId = (): string => crypto.randomUUID();
 const MAX_WORKSPACES = 10;
@@ -26,7 +33,12 @@ const clampTerminalFontSize = (value: number): number => {
 
 const getActiveTerminal = (state: CanvasState): Terminal | undefined => {
   const workspace = state.workspaces[state.activeWorkspaceIndex];
-  return workspace?.terminals[workspace.activeTerminalIndex];
+  const activeItem = workspace?.items[workspace.activeItemIndex];
+  return activeItem?.type === 'terminal' ? activeItem : undefined;
+};
+
+const getTerminalItems = (workspace: Workspace): Terminal[] => {
+  return workspace.items.filter((item): item is Terminal => item.type === 'terminal');
 };
 
 const createWorkspaceTitle = (workspaces: Workspace[]): string => {
@@ -37,8 +49,8 @@ const createWorkspace = (workspaces: Workspace[]): Workspace => {
   return {
     id: createId(),
     title: createWorkspaceTitle(workspaces),
-    terminals: [],
-    activeTerminalIndex: 0,
+    items: [],
+    activeItemIndex: 0,
   };
 };
 
@@ -59,7 +71,7 @@ const pruneEmptyWorkspaceOnLeave = (
   }
 
   const activeWorkspace = workspaces[activeWorkspaceIndex];
-  if (!activeWorkspace || activeWorkspace.terminals.length > 0 || workspaces.length <= 1) {
+  if (!activeWorkspace || activeWorkspace.items.length > 0 || workspaces.length <= 1) {
     return { workspaces, activeWorkspaceIndex: nextWorkspaceIndex };
   }
 
@@ -72,6 +84,88 @@ const pruneEmptyWorkspaceOnLeave = (
   return {
     workspaces: reindexWorkspaces(updatedWorkspaces),
     activeWorkspaceIndex: Math.max(0, Math.min(adjustedIndex, updatedWorkspaces.length - 1)),
+  };
+};
+
+const isRecord = (value: unknown): value is Record<string, unknown> => {
+  return typeof value === 'object' && value !== null;
+};
+
+const migrateWorkspace = (workspace: unknown): Workspace | null => {
+  if (!isRecord(workspace)) {
+    return null;
+  }
+
+  const legacyTerminals = Array.isArray(workspace.terminals)
+    ? workspace.terminals
+    : undefined;
+  const rawItems = Array.isArray(workspace.items) ? workspace.items : legacyTerminals;
+  if (!rawItems) {
+    return null;
+  }
+
+  const items = rawItems
+    .filter(isRecord)
+    .map((item): WorkspaceItem | null => {
+      if (typeof item.id !== 'string' || typeof item.widthFraction !== 'string') {
+        return null;
+      }
+
+      if (item.type === 'diff') {
+        if (typeof item.cwd !== 'string') {
+          return null;
+        }
+        return {
+          id: item.id,
+          type: 'diff',
+          title: typeof item.title === 'string' ? item.title : 'Git diff',
+          cwd: item.cwd,
+          sourceTerminalId:
+            typeof item.sourceTerminalId === 'string' ? item.sourceTerminalId : undefined,
+          widthFraction: item.widthFraction as WidthFraction,
+        };
+      }
+
+      return {
+        id: item.id,
+        type: 'terminal',
+        title: typeof item.title === 'string' ? item.title : 'Terminal',
+        profileId:
+          typeof item.profileId === 'string'
+            ? (item.profileId as TerminalProfileId)
+            : undefined,
+        widthFraction: item.widthFraction as WidthFraction,
+      };
+    })
+    .filter((item): item is WorkspaceItem => item !== null);
+
+  const activeItemIndex =
+    typeof workspace.activeItemIndex === 'number'
+      ? workspace.activeItemIndex
+      : typeof workspace.activeTerminalIndex === 'number'
+        ? workspace.activeTerminalIndex
+        : 0;
+
+  return {
+    id: typeof workspace.id === 'string' ? workspace.id : createId(),
+    title: typeof workspace.title === 'string' ? workspace.title : 'Workspace',
+    items,
+    activeItemIndex: Math.max(0, Math.min(activeItemIndex, Math.max(0, items.length - 1))),
+  };
+};
+
+const migratePersistedState = (persistedState: unknown): CanvasState | unknown => {
+  if (!isRecord(persistedState) || !Array.isArray(persistedState.workspaces)) {
+    return persistedState;
+  }
+
+  const workspaces = persistedState.workspaces
+    .map(migrateWorkspace)
+    .filter((workspace): workspace is Workspace => workspace !== null);
+
+  return {
+    ...persistedState,
+    workspaces: workspaces.length > 0 ? reindexWorkspaces(workspaces) : [createWorkspace([])],
   };
 };
 
@@ -96,16 +190,39 @@ export const useCanvasStore = create<CanvasState>()(
         set((state) => ({ isSearchOpen: !state.isSearchOpen }));
       },
 
+      focusWorkspaceItem: (itemId: string) => {
+        set((state) => {
+          const workspace = state.workspaces[state.activeWorkspaceIndex];
+          if (!workspace) return state;
+
+          const activeItemIndex = workspace.items.findIndex((item) => item.id === itemId);
+          if (activeItemIndex === -1) return state;
+
+          const updatedWorkspaces = [...state.workspaces];
+          updatedWorkspaces[state.activeWorkspaceIndex] = {
+            ...workspace,
+            activeItemIndex,
+          };
+
+          return {
+            workspaces: updatedWorkspaces,
+            isTerminalFullscreen: false,
+          };
+        });
+      },
+
       jumpToGlobalTerminal: (terminalId: string) => {
         set((state) => {
           let targetWsIndex = -1;
-          let targetTermIndex = -1;
+          let targetItemIndex = -1;
 
           state.workspaces.forEach((ws, wsIdx) => {
-            const termIdx = ws.terminals.findIndex((t) => t.id === terminalId);
-            if (termIdx !== -1) {
+            const itemIdx = ws.items.findIndex(
+              (item) => item.type === 'terminal' && item.id === terminalId,
+            );
+            if (itemIdx !== -1) {
               targetWsIndex = wsIdx;
-              targetTermIndex = termIdx;
+              targetItemIndex = itemIdx;
             }
           });
 
@@ -120,7 +237,7 @@ export const useCanvasStore = create<CanvasState>()(
           const updatedWorkspaces = [...navigationState.workspaces];
           updatedWorkspaces[navigationState.activeWorkspaceIndex] = {
             ...updatedWorkspaces[navigationState.activeWorkspaceIndex],
-            activeTerminalIndex: targetTermIndex,
+            activeItemIndex: targetItemIndex,
           };
 
           return {
@@ -160,7 +277,7 @@ export const useCanvasStore = create<CanvasState>()(
           if (direction === 'down' && isAtBottom) {
             if (
               !activeWorkspace ||
-              activeWorkspace.terminals.length === 0 ||
+              activeWorkspace.items.length === 0 ||
               state.workspaces.length >= MAX_WORKSPACES
             ) {
               return state;
@@ -187,12 +304,15 @@ export const useCanvasStore = create<CanvasState>()(
         set((state) => {
           const ws = state.workspaces[state.activeWorkspaceIndex];
           if (!ws) return state;
-          const targetIndex = Math.max(0, Math.min(index, ws.terminals.length - 1));
+          const terminalItems = getTerminalItems(ws);
+          const targetTerminal = terminalItems[Math.max(0, Math.min(index, terminalItems.length - 1))];
+          if (!targetTerminal) return state;
+          const targetIndex = ws.items.findIndex((item) => item.id === targetTerminal.id);
 
           const updatedWorkspaces = [...state.workspaces];
           updatedWorkspaces[state.activeWorkspaceIndex] = {
             ...ws,
-            activeTerminalIndex: targetIndex,
+            activeItemIndex: targetIndex,
           };
           return { workspaces: updatedWorkspaces, isTerminalFullscreen: false };
         });
@@ -201,17 +321,17 @@ export const useCanvasStore = create<CanvasState>()(
       moveTerminal: (direction) => {
         set((state) => {
           const ws = state.workspaces[state.activeWorkspaceIndex];
-          if (!ws || ws.terminals.length === 0) return state;
+          if (!ws || ws.items.length === 0) return state;
 
-          const newTerminalIndex =
+          const activeItemIndex =
             direction === 'left'
-              ? Math.max(0, ws.activeTerminalIndex - 1)
-              : Math.min(ws.terminals.length - 1, ws.activeTerminalIndex + 1);
+              ? Math.max(0, ws.activeItemIndex - 1)
+              : Math.min(ws.items.length - 1, ws.activeItemIndex + 1);
 
           const updatedWorkspaces = [...state.workspaces];
           updatedWorkspaces[state.activeWorkspaceIndex] = {
             ...ws,
-            activeTerminalIndex: newTerminalIndex,
+            activeItemIndex,
           };
           return { workspaces: updatedWorkspaces, isTerminalFullscreen: false };
         });
@@ -222,16 +342,18 @@ export const useCanvasStore = create<CanvasState>()(
           const ws = state.workspaces[state.activeWorkspaceIndex];
           if (!ws) return state;
 
+          const terminalCount = getTerminalItems(ws).length;
           const newTerminal: Terminal = {
             id: createId(),
-            title: `Terminal ${ws.terminals.length + 1}`,
+            type: 'terminal',
+            title: `Terminal ${terminalCount + 1}`,
             widthFraction: '2/3',
             profileId,
           };
           const updatedWorkspace: Workspace = {
             ...ws,
-            terminals: [...ws.terminals, newTerminal],
-            activeTerminalIndex: ws.terminals.length,
+            items: [...ws.items, newTerminal],
+            activeItemIndex: ws.items.length,
           };
           const updatedWorkspaces = [...state.workspaces];
           updatedWorkspaces[state.activeWorkspaceIndex] = updatedWorkspace;
@@ -239,22 +361,55 @@ export const useCanvasStore = create<CanvasState>()(
         });
       },
 
+      addDiffPanel: (cwd: string, sourceTerminalId?: string) => {
+        set((state) => {
+          const ws = state.workspaces[state.activeWorkspaceIndex];
+          if (!ws) return state;
+
+          const newDiffPanel: DiffPanel = {
+            id: createId(),
+            type: 'diff',
+            title: 'Git diff',
+            cwd,
+            sourceTerminalId,
+            widthFraction: '1',
+          };
+          const insertIndex = Math.min(ws.activeItemIndex + 1, ws.items.length);
+          const updatedWorkspace: Workspace = {
+            ...ws,
+            items: [
+              ...ws.items.slice(0, insertIndex),
+              newDiffPanel,
+              ...ws.items.slice(insertIndex),
+            ],
+            activeItemIndex: insertIndex,
+          };
+          const updatedWorkspaces = [...state.workspaces];
+          updatedWorkspaces[state.activeWorkspaceIndex] = updatedWorkspace;
+          return {
+            workspaces: updatedWorkspaces,
+            isTerminalFullscreen: false,
+            isSearchOpen: false,
+          };
+        });
+      },
+
       removeTerminal: () => {
         set((state) => {
           const ws = state.workspaces[state.activeWorkspaceIndex];
-          if (!ws || ws.terminals.length === 0) return state;
+          if (!ws || ws.items.length === 0) return state;
 
           const newWorkspaces = [...state.workspaces];
-          const currentWs = { ...ws, terminals: [...ws.terminals] };
+          const currentWs = { ...ws, items: [...ws.items] };
+          const removedItem = ws.items[ws.activeItemIndex];
 
-          currentWs.terminals.splice(currentWs.activeTerminalIndex, 1);
-          const removedTerminal = ws.terminals[ws.activeTerminalIndex];
+          currentWs.items.splice(currentWs.activeItemIndex, 1);
 
-          if (currentWs.activeTerminalIndex >= currentWs.terminals.length) {
-            currentWs.activeTerminalIndex = Math.max(0, currentWs.terminals.length - 1);
+          if (currentWs.activeItemIndex >= currentWs.items.length) {
+            currentWs.activeItemIndex = Math.max(0, currentWs.items.length - 1);
           }
 
-          if (currentWs.terminals.length === 0 && newWorkspaces.length > 1) {
+          if (currentWs.items.length === 0 && newWorkspaces.length > 1) {
             newWorkspaces.splice(state.activeWorkspaceIndex, 1);
 
             let newWSIndex = state.activeWorkspaceIndex;
@@ -267,7 +422,8 @@ export const useCanvasStore = create<CanvasState>()(
               workspaces: reindexWorkspaces(newWorkspaces),
               terminalFontSizes: Object.fromEntries(
                 Object.entries(state.terminalFontSizes).filter(
-                  ([terminalId]) => terminalId !== removedTerminal?.id,
+                  ([terminalId]) =>
+                    removedItem?.type !== 'terminal' || terminalId !== removedItem.id,
                 ),
               ),
               activeWorkspaceIndex: newWSIndex,
@@ -280,7 +436,8 @@ export const useCanvasStore = create<CanvasState>()(
             workspaces: newWorkspaces,
             terminalFontSizes: Object.fromEntries(
               Object.entries(state.terminalFontSizes).filter(
-                ([terminalId]) => terminalId !== removedTerminal?.id,
+                ([terminalId]) =>
+                  removedItem?.type !== 'terminal' || terminalId !== removedItem.id,
               ),
             ),
             isTerminalFullscreen: false,
@@ -292,24 +449,24 @@ export const useCanvasStore = create<CanvasState>()(
         set((state) => {
           const ws = state.workspaces[state.activeWorkspaceIndex];
           if (!ws) return state;
-          const term = ws.terminals[ws.activeTerminalIndex];
-          if (!term) return state;
+          const item = ws.items[ws.activeItemIndex];
+          if (!item) return state;
 
-          const currentIdx = WIDTH_CYCLE.indexOf(term.widthFraction);
+          const currentIdx = WIDTH_CYCLE.indexOf(item.widthFraction);
           const nextIdx =
             direction === 'shrink'
               ? Math.min(WIDTH_CYCLE.length - 1, currentIdx + 1)
               : Math.max(0, currentIdx - 1);
 
-          const updatedTerminals = [...ws.terminals];
-          updatedTerminals[ws.activeTerminalIndex] = {
-            ...term,
+          const updatedItems = [...ws.items];
+          updatedItems[ws.activeItemIndex] = {
+            ...item,
             widthFraction: WIDTH_CYCLE[nextIdx],
-          };
+          } as WorkspaceItem;
           const updatedWorkspaces = [...state.workspaces];
           updatedWorkspaces[state.activeWorkspaceIndex] = {
             ...ws,
-            terminals: updatedTerminals,
+            items: updatedItems,
           };
           return { workspaces: updatedWorkspaces };
         });
@@ -319,21 +476,21 @@ export const useCanvasStore = create<CanvasState>()(
         set((state) => {
           const ws = state.workspaces[state.activeWorkspaceIndex];
           if (!ws) return state;
-          const term = ws.terminals[ws.activeTerminalIndex];
-          if (!term) return state;
+          const item = ws.items[ws.activeItemIndex];
+          if (!item) return state;
 
-          const currentIdx = WIDTH_CYCLE.indexOf(term.widthFraction);
+          const currentIdx = WIDTH_CYCLE.indexOf(item.widthFraction);
           const nextIdx = (currentIdx + 1) % WIDTH_CYCLE.length;
 
-          const updatedTerminals = [...ws.terminals];
-          updatedTerminals[ws.activeTerminalIndex] = {
-            ...term,
+          const updatedItems = [...ws.items];
+          updatedItems[ws.activeItemIndex] = {
+            ...item,
             widthFraction: WIDTH_CYCLE[nextIdx],
-          };
+          } as WorkspaceItem;
           const updatedWorkspaces = [...state.workspaces];
           updatedWorkspaces[state.activeWorkspaceIndex] = {
             ...ws,
-            terminals: updatedTerminals,
+            items: updatedItems,
           };
           return { workspaces: updatedWorkspaces };
         });
@@ -378,7 +535,7 @@ export const useCanvasStore = create<CanvasState>()(
       addWorkspace: () => {
         set((state) => {
           const activeWorkspace = state.workspaces[state.activeWorkspaceIndex];
-          if (!activeWorkspace || activeWorkspace.terminals.length === 0) {
+          if (!activeWorkspace || activeWorkspace.items.length === 0) {
             return state;
           }
           if (state.workspaces.length >= MAX_WORKSPACES) {
@@ -418,7 +575,8 @@ export const useCanvasStore = create<CanvasState>()(
     {
       name: 'kmux-storage',
       storage: createJSONStorage(() => localStorage),
-      version: 3,
+      version: 4,
+      migrate: migratePersistedState,
     },
   ),
 );

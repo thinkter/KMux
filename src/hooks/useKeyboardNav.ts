@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useCanvasStore } from '../store/useCanvasStore';
 import { useTerminalPicker } from '../terminal/renderer/context/use-terminal-picker';
+import { useTerminalRuntime } from '../terminal/renderer/context/useTerminalRuntime';
 
 export const useKeyboardNav = () => {
   const {
@@ -8,6 +9,7 @@ export const useKeyboardNav = () => {
     moveWorkspace,
     jumpToWorkspace,
     addTerminal,
+    addDiffPanel,
     addWorkspace,
     removeTerminal,
     resizeTerminal,
@@ -18,7 +20,10 @@ export const useKeyboardNav = () => {
     toggleTerminalFullscreen,
     cycleThemes,
     toggleSearch,
+    workspaces,
+    activeWorkspaceIndex,
   } = useCanvasStore();
+  const { sessions } = useTerminalRuntime();
   const { isOpen: isPickerOpen, openPicker } = useTerminalPicker();
 
   useEffect(() => {
@@ -65,6 +70,23 @@ export const useKeyboardNav = () => {
         } else if (e.altKey && e.shiftKey && key === 'n') {
           openPicker('workspace');
           handled = true;
+        } else if (e.altKey && key === 'c') {
+          const workspace = workspaces[activeWorkspaceIndex];
+          const activeItem = workspace?.items[workspace.activeItemIndex];
+          if (activeItem?.type === 'diff') {
+            addDiffPanel(activeItem.cwd, activeItem.sourceTerminalId);
+            handled = true;
+          } else if (activeItem?.type === 'terminal') {
+            const session = sessions[activeItem.id];
+            const cwd =
+              session?.currentCwd?.isLocal === true
+                ? session.currentCwd.path
+                : session?.cwd;
+            if (cwd) {
+              addDiffPanel(cwd, activeItem.id);
+              handled = true;
+            }
+          }
         } else if (e.altKey && key === 'b') {
           toggleTerminalFullscreen();
           handled = true;
@@ -153,6 +175,7 @@ export const useKeyboardNav = () => {
     moveWorkspace,
     jumpToWorkspace,
     addTerminal,
+    addDiffPanel,
     addWorkspace,
     removeTerminal,
     resizeTerminal,
@@ -163,6 +186,9 @@ export const useKeyboardNav = () => {
     toggleTerminalFullscreen,
     cycleThemes,
     toggleSearch,
+    workspaces,
+    activeWorkspaceIndex,
+    sessions,
     isPickerOpen,
     openPicker,
   ]);
