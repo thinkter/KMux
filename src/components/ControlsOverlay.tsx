@@ -1,55 +1,11 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useCanvasStore } from "../store/useCanvasStore";
 import { Z_LAYERS } from "../lib/constants";
+import { KEYBIND_SECTIONS, type KeyBindDisplay, type KeyBindSection } from "../lib/keybinds";
 
 /* ── Data ─────────────────────────────────────────────────────────── */
 
-interface Binding {
-  label: string;
-  shortcut: string; // displayed as inline text e.g. "Alt + J/K"
-}
-
-interface Section {
-  title: string;
-  bindings: Binding[];
-}
-
-const SECTIONS: Section[] = [
-  {
-    title: "Navigation",
-    bindings: [
-      { label: "Focus terminal", shortcut: "Alt + ← →" },
-      { label: "Switch workspace", shortcut: "Alt + J/K" },
-      { label: "Jump to workspace", shortcut: "Alt + 1-9" },
-    ],
-  },
-  {
-    title: "Terminals",
-    bindings: [
-      { label: "New terminal", shortcut: "Alt + Enter" },
-      { label: "Choose profile", shortcut: "Alt + Shift + Enter" },
-      { label: "Close terminal", shortcut: "Alt + Q/W" },
-      { label: "Toggle fullscreen", shortcut: "Alt + B" },
-    ],
-  },
-  {
-    title: "Layout",
-    bindings: [
-      { label: "Cycle width", shortcut: "Alt + R" },
-      { label: "Resize", shortcut: "Alt + -/=" },
-      { label: "Font size", shortcut: "Ctrl + -/=" },
-    ],
-  },
-  {
-    title: "Utilities",
-    bindings: [
-      { label: "Overview", shortcut: "Alt + O" },
-      { label: "Fuzzy finder", shortcut: "Alt + F" },
-      { label: "Cycle themes", shortcut: "Alt + T" },
-      { label: "Toggle help", shortcut: "Alt + ?" },
-    ],
-  },
-];
+const OVERLAY_TITLE_ID = "controls-overlay-title";
 
 /* ── Inject keyframes once ────────────────────────────────────────── */
 
@@ -98,6 +54,16 @@ function ensureKeyframes() {
         transform: translateX(0);
       }
     }
+    .controls-overlay-close {
+      background: rgba(255,255,255,0.06);
+      color: rgba(255,255,255,0.4);
+      border-color: rgba(255,255,255,0.08);
+    }
+    .controls-overlay-close:hover {
+      background: rgba(255,255,255,0.10);
+      color: rgba(255,255,255,0.6);
+      border-color: rgba(255,255,255,0.15);
+    }
   `;
   document.head.appendChild(style);
 }
@@ -110,7 +76,7 @@ const ANIM_DURATION = 200; // ms
 /* ── Sub-components ───────────────────────────────────────────────── */
 
 const BindingRow: React.FC<{
-  binding: Binding;
+  binding: KeyBindDisplay;
   textColor: string;
   textDim: string;
   delay: number;
@@ -152,7 +118,7 @@ const BindingRow: React.FC<{
 );
 
 const SectionBlock: React.FC<{
-  section: Section;
+  section: KeyBindSection;
   textColor: string;
   textDim: string;
   sectionLabelColor: string;
@@ -205,6 +171,7 @@ export const ControlsOverlay: React.FC = () => {
   const [closing, setClosing] = useState(false);
   const [animateRows, setAnimateRows] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
+  const previouslyFocusedRef = useRef<HTMLElement | null>(null);
 
   // Inject keyframes stylesheet
   useEffect(() => {
@@ -226,7 +193,22 @@ export const ControlsOverlay: React.FC = () => {
       }, ANIM_DURATION);
       return () => clearTimeout(timer);
     }
-  }, [isControlsOpen]);
+  }, [isControlsOpen, visible]);
+
+  // Move focus into the dialog while open, then restore it after close.
+  useEffect(() => {
+    if (!isControlsOpen || !visible) return;
+
+    previouslyFocusedRef.current = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null;
+    panelRef.current?.focus();
+
+    return () => {
+      previouslyFocusedRef.current?.focus();
+      previouslyFocusedRef.current = null;
+    };
+  }, [isControlsOpen, visible]);
 
   // ESC to close
   useEffect(() => {
@@ -249,7 +231,7 @@ export const ControlsOverlay: React.FC = () => {
   // Compute stagger delays for each section sequentially
   let runningDelay = 0;
   const sectionDelays: number[] = [];
-  SECTIONS.forEach((s) => {
+  KEYBIND_SECTIONS.forEach((s) => {
     sectionDelays.push(runningDelay);
     runningDelay += (s.bindings.length + 1) * 30 + 50;
   });
@@ -276,6 +258,10 @@ export const ControlsOverlay: React.FC = () => {
     >
       <div
         ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={OVERLAY_TITLE_ID}
+        tabIndex={-1}
         style={{
           background: `linear-gradient(180deg, rgba(16, 12, 10, 0.98) 0%, rgba(8, 6, 5, 0.99) 100%)`,
           border: `1px solid ${theme.border}`,
@@ -303,6 +289,7 @@ export const ControlsOverlay: React.FC = () => {
           }}
         >
           <span
+            id={OVERLAY_TITLE_ID}
             style={{
               fontSize: "11px",
               fontWeight: 700,
@@ -315,29 +302,19 @@ export const ControlsOverlay: React.FC = () => {
             KMUX CONTROLS
           </span>
           <button
+            className="controls-overlay-close"
             onClick={toggleControls}
+            aria-label="Close controls"
             style={{
-              background: "rgba(255,255,255,0.06)",
-              color: "rgba(255,255,255,0.4)",
               fontSize: "10px",
               fontWeight: 500,
               fontFamily: FONT,
               padding: "4px 8px",
               borderRadius: "4px",
-              border: "1px solid rgba(255,255,255,0.08)",
+              border: "1px solid",
               cursor: "pointer",
               lineHeight: 1,
               transition: "all 150ms ease",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = "rgba(255,255,255,0.10)";
-              e.currentTarget.style.color = "rgba(255,255,255,0.6)";
-              e.currentTarget.style.borderColor = "rgba(255,255,255,0.15)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = "rgba(255,255,255,0.06)";
-              e.currentTarget.style.color = "rgba(255,255,255,0.4)";
-              e.currentTarget.style.borderColor = "rgba(255,255,255,0.08)";
             }}
           >
             ESC
@@ -353,7 +330,7 @@ export const ControlsOverlay: React.FC = () => {
             padding: "4px 0",
           }}
         >
-          {SECTIONS.map((s, i) => (
+          {KEYBIND_SECTIONS.map((s, i) => (
             <SectionBlock
               key={s.title}
               section={s}

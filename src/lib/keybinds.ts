@@ -78,9 +78,9 @@ export const KEYBINDS: KeyBind[] = [
   // ── Alt + Shift (most specific alt combos) ──
   { action: 'openTerminalPicker', alt: true, shift: true, keys: ['enter'] },
   { action: 'openWorkspacePicker', alt: true, shift: true, keys: ['n'] },
-  { action: 'toggleControls', alt: true, shift: true, keys: ['?'] },
 
   // ── Alt only ──
+  { action: 'toggleControls', alt: true, keys: ['/', '?'] },
   { action: 'toggleFullscreen', alt: true, keys: ['b'] },
   { action: 'jumpToWorkspace', alt: true, keyPattern: /^[1-9]$/ },
   { action: 'moveTerminalLeft', alt: true, keys: ['arrowleft', 'h'] },
