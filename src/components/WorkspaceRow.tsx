@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useCanvasStore } from "../store/useCanvasStore";
 import type { Workspace } from "../store/useCanvasStore";
 import { TerminalPanel } from "./TerminalPanel";
+import { DiffPanel } from "./DiffPanel";
 import { getWidthVW } from "../utils/layout";
 import { CAMERA_PADDING, GAPS_VW, SCREEN_WIDTH_VW } from "../lib/constants";
 
@@ -16,8 +17,8 @@ export const WorkspaceRow: React.FC<Props> = ({
 }) => {
   const [viewOffset, setViewOffset] = useState(0);
   const { theme, isOverview, isTerminalFullscreen } = useCanvasStore();
-  const totalRowWidth = workspace.terminals.reduce(
-    (total, terminal) => total + getWidthVW(terminal.widthFraction) + GAPS_VW,
+  const totalRowWidth = workspace.items.reduce(
+    (total, item) => total + getWidthVW(item.widthFraction) + GAPS_VW,
     0,
   );
   const fitsOnScreen = totalRowWidth <= SCREEN_WIDTH_VW;
@@ -27,20 +28,20 @@ export const WorkspaceRow: React.FC<Props> = ({
    * Calculates the perspective camera's offset based on terminal density and focus.
    */
   useEffect(() => {
-    if (workspace.terminals.length === 0) {
+    if (workspace.items.length === 0) {
       setViewOffset(0);
       return;
     }
 
-    const { activeTerminalIndex, terminals } = workspace;
+    const { activeItemIndex, items } = workspace;
 
     // Relative positioning calculations
     let activeLeft = 0;
-    for (let i = 0; i < activeTerminalIndex; i++) {
-      activeLeft += getWidthVW(terminals[i].widthFraction) + GAPS_VW;
+    for (let i = 0; i < activeItemIndex; i++) {
+      activeLeft += getWidthVW(items[i].widthFraction) + GAPS_VW;
     }
     const activeWidth = getWidthVW(
-      terminals[activeTerminalIndex].widthFraction,
+      items[activeItemIndex].widthFraction,
     );
     const activeRight = activeLeft + activeWidth + GAPS_VW;
 
@@ -49,16 +50,16 @@ export const WorkspaceRow: React.FC<Props> = ({
       const maxOffset = Math.max(0, totalRowWidth - SCREEN_WIDTH_VW);
 
       // Single-Terminal Centering (Focal Focus mode)
-      if (terminals.length === 1 || totalRowWidth <= SCREEN_WIDTH_VW) {
+      if (items.length === 1 || totalRowWidth <= SCREEN_WIDTH_VW) {
         targetOffset = 0;
       }
       // Multi-Terminal Panning (Magnetic Strip mode)
       else {
-        const isLastTerminal = activeTerminalIndex === terminals.length - 1;
+        const isLastItem = activeItemIndex === items.length - 1;
 
         // Right-edge magnetism for context reveal
         // Clamp to activeLeft so a wide terminal is never scrolled off its own left edge
-        if (isLastTerminal) {
+        if (isLastItem) {
           targetOffset = Math.min(
             activeRight - SCREEN_WIDTH_VW + CAMERA_PADDING,
             activeLeft,
@@ -78,13 +79,13 @@ export const WorkspaceRow: React.FC<Props> = ({
       // Threshold-based state update to minimize jitter
       return Math.abs(targetOffset - currentOffset) > 0.01 ? targetOffset : currentOffset;
     });
-  }, [workspace.activeTerminalIndex, workspace.terminals, totalRowWidth]);
+  }, [workspace.activeItemIndex, workspace.items, totalRowWidth]);
 
-  const activeTerminal = workspace.terminals[workspace.activeTerminalIndex];
-  const visibleTerminals =
-    isActiveWorkspace && isTerminalFullscreen && activeTerminal
-      ? [activeTerminal]
-      : workspace.terminals;
+  const activeItem = workspace.items[workspace.activeItemIndex];
+  const visibleItems =
+    isActiveWorkspace && isTerminalFullscreen && activeItem
+      ? [activeItem]
+      : workspace.items;
   const shouldCenterTerminals =
     fitsOnScreen || (isActiveWorkspace && isTerminalFullscreen);
 
@@ -94,7 +95,7 @@ export const WorkspaceRow: React.FC<Props> = ({
         isActiveWorkspace || isOverview ? "opacity-100" : "opacity-40"
       }`}
     >
-      {workspace.terminals.length === 0 ? (
+      {workspace.items.length === 0 ? (
         <div className="w-full text-center select-none">
           {isActiveWorkspace ? (
             <div>
@@ -144,16 +145,17 @@ export const WorkspaceRow: React.FC<Props> = ({
             justifyContent: shouldCenterTerminals ? "center" : undefined,
           }}
         >
-          {visibleTerminals.map((term) => {
-            const terminalIsActive =
-              isActiveWorkspace && term.id === activeTerminal?.id;
+          {visibleItems.map((item) => {
+            const itemIsActive = isActiveWorkspace && item.id === activeItem?.id;
 
-            return (
+            return item.type === "terminal" ? (
               <TerminalPanel
-                key={term.id}
-                terminal={term}
-                isActive={terminalIsActive}
+                key={item.id}
+                terminal={item}
+                isActive={itemIsActive}
               />
+            ) : (
+              <DiffPanel key={item.id} panel={item} isActive={itemIsActive} />
             );
           })}
         </div>

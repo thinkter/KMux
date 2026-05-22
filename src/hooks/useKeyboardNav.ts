@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { useCanvasStore } from '../store/useCanvasStore';
 import { useTerminalPicker } from '../terminal/renderer/context/use-terminal-picker';
-import { findKeybind, type KeyAction } from '../lib/keybinds';
+import { useTerminalRuntime } from '../terminal/renderer/context/useTerminalRuntime';
 
 export const useKeyboardNav = () => {
   const {
@@ -9,123 +9,165 @@ export const useKeyboardNav = () => {
     moveWorkspace,
     jumpToWorkspace,
     addTerminal,
+    addDiffPanel,
     addWorkspace,
     removeTerminal,
     resizeTerminal,
     adjustActiveTerminalFontSize,
     adjustGlobalTerminalFontSize,
+    adjustActiveDiffFontSize,
     cycleWidth,
     toggleOverview,
     toggleTerminalFullscreen,
     cycleThemes,
     toggleSearch,
-    toggleControls,
-    isControlsOpen,
+    workspaces,
+    activeWorkspaceIndex,
   } = useCanvasStore();
+  const { sessions } = useTerminalRuntime();
   const { isOpen: isPickerOpen, openPicker } = useTerminalPicker();
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (isPickerOpen) return;
-
-      const matched = findKeybind(e);
-      if (!matched) return;
-
-      if (isControlsOpen && matched.action !== 'toggleControls') {
-        e.preventDefault();
-        e.stopPropagation();
+      if (isPickerOpen) {
         return;
       }
 
-      let handled = true;
-      const action: KeyAction = matched.action;
+      if (e.ctrlKey && !e.metaKey && !e.altKey) {
+        const key = e.key.toLowerCase();
+        let handled = false;
+        const workspace = workspaces[activeWorkspaceIndex];
+        const activeItem = workspace?.items[workspace.activeItemIndex];
 
-      switch (action) {
-        // ── Navigation ──
-        case 'moveTerminalLeft':
-          moveTerminal('left');
-          break;
-        case 'moveTerminalRight':
-          moveTerminal('right');
-          break;
-        case 'moveWorkspaceUp':
-          moveWorkspace('up');
-          break;
-        case 'moveWorkspaceDown':
-          moveWorkspace('down');
-          break;
-        case 'jumpToWorkspace':
-          jumpToWorkspace(parseInt(e.key, 10) - 1);
-          break;
+        if (key === '+' || key === '=') {
+          if (activeItem?.type === 'diff') {
+            adjustActiveDiffFontSize('increase');
+          } else if (e.shiftKey) {
+            adjustGlobalTerminalFontSize('increase');
+          } else {
+            adjustActiveTerminalFontSize('increase');
+          }
+          handled = true;
+        } else if (key === '-' || key === '_') {
+          if (activeItem?.type === 'diff') {
+            adjustActiveDiffFontSize('decrease');
+          } else if (e.shiftKey) {
+            adjustGlobalTerminalFontSize('decrease');
+          } else {
+            adjustActiveTerminalFontSize('decrease');
+          }
+          handled = true;
+        }
 
-        // ── Terminals ──
-        case 'addTerminal':
-          addTerminal();
-          break;
-        case 'openTerminalPicker':
-          openPicker('terminal');
-          break;
-        case 'removeTerminal':
-          removeTerminal();
-          break;
-
-        // ── Workspaces ──
-        case 'addWorkspace':
-          addWorkspace();
-          break;
-        case 'openWorkspacePicker':
-          openPicker('workspace');
-          break;
-
-        // ── Layout ──
-        case 'toggleFullscreen':
-          toggleTerminalFullscreen();
-          break;
-        case 'cycleWidth':
-          cycleWidth();
-          break;
-        case 'resizeShrink':
-          resizeTerminal('shrink');
-          break;
-        case 'resizeExpand':
-          resizeTerminal('expand');
-          break;
-
-        // ── Font size ──
-        case 'fontSizeIncrease':
-          adjustActiveTerminalFontSize('increase');
-          break;
-        case 'fontSizeDecrease':
-          adjustActiveTerminalFontSize('decrease');
-          break;
-        case 'globalFontSizeIncrease':
-          adjustGlobalTerminalFontSize('increase');
-          break;
-        case 'globalFontSizeDecrease':
-          adjustGlobalTerminalFontSize('decrease');
-          break;
-
-        // ── Utilities ──
-        case 'toggleOverview':
-          toggleOverview();
-          break;
-        case 'toggleSearch':
-          toggleSearch();
-          break;
-        case 'cycleThemes':
-          cycleThemes();
-          break;
-        case 'toggleControls':
-          toggleControls();
-          break;
-
-        default:
-          handled = false;
+        if (handled) {
+          e.preventDefault();
+          e.stopPropagation();
+          return;
+        }
       }
 
-      if (handled) {
-        e.preventDefault();
-        e.stopPropagation();
+      // Intercept Meta (Cmd/Win) or Alt keys
+      if (e.metaKey || e.altKey) {
+        let handled = false;
+        const key = e.key.toLowerCase();
+
+        if (e.altKey && e.shiftKey && key === 'enter') {
+          openPicker('terminal');
+          handled = true;
+        } else if (e.altKey && e.shiftKey && key === 'n') {
+          openPicker('workspace');
+          handled = true;
+        } else if (e.altKey && key === 'c') {
+          const workspace = workspaces[activeWorkspaceIndex];
+          const activeItem = workspace?.items[workspace.activeItemIndex];
+          if (activeItem?.type === 'diff') {
+            addDiffPanel(activeItem.cwd, activeItem.sourceTerminalId);
+            handled = true;
+          } else if (activeItem?.type === 'terminal') {
+            const session = sessions[activeItem.id];
+            const cwd =
+              session?.currentCwd?.isLocal === true
+                ? session.currentCwd.path
+                : session?.cwd;
+            if (cwd) {
+              addDiffPanel(cwd, activeItem.id);
+              handled = true;
+            }
+          }
+        } else if (e.altKey && key === 'b') {
+          toggleTerminalFullscreen();
+          handled = true;
+        } else if (e.altKey && /^[1-9]$/.test(key)) {
+          jumpToWorkspace(parseInt(key, 10) - 1);
+          handled = true;
+        } else {
+          switch (key) {
+            case 'arrowleft':
+            case 'h':
+              moveTerminal('left');
+              handled = true;
+              break;
+            case 'arrowright':
+            case 'l':
+              moveTerminal('right');
+              handled = true;
+              break;
+            case 'arrowup':
+            case 'k':
+              moveWorkspace('up');
+              handled = true;
+              break;
+            case 'arrowdown':
+            case 'j':
+              moveWorkspace('down');
+              handled = true;
+              break;
+            case 'enter':
+              addTerminal();
+              handled = true;
+              break;
+            case 'n':
+              addWorkspace();
+              handled = true;
+              break;
+            case 'w':
+            case 'q':
+            case 'x':
+              removeTerminal();
+              handled = true;
+              break;
+            case 'o':
+              toggleOverview();
+              handled = true;
+              break;
+            case 't':
+              cycleThemes();
+              handled = true;
+              break;
+            case 'f':
+              toggleSearch();
+              handled = true;
+              break;
+            case 'r':
+              cycleWidth();
+              handled = true;
+              break;
+            case '-':
+              resizeTerminal('shrink');
+              handled = true;
+              break;
+            case '=':
+            case '+':
+              resizeTerminal('expand');
+              handled = true;
+              break;
+          }
+        }
+
+        if (handled) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
       }
     };
 
@@ -140,18 +182,21 @@ export const useKeyboardNav = () => {
     moveWorkspace,
     jumpToWorkspace,
     addTerminal,
+    addDiffPanel,
     addWorkspace,
     removeTerminal,
     resizeTerminal,
     adjustActiveTerminalFontSize,
     adjustGlobalTerminalFontSize,
+    adjustActiveDiffFontSize,
     cycleWidth,
     toggleOverview,
     toggleTerminalFullscreen,
     cycleThemes,
     toggleSearch,
-    toggleControls,
-    isControlsOpen,
+    workspaces,
+    activeWorkspaceIndex,
+    sessions,
     isPickerOpen,
     openPicker,
   ]);

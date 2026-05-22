@@ -1,4 +1,6 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron';
+import { DIFF_IPC_CHANNELS } from './diff/shared/diff-ipc';
+import type { DiffApi } from './diff/shared/diff-types';
 import { TERMINAL_IPC_CHANNELS } from './terminal/shared/terminal-ipc';
 import type {
   TerminalApi,
@@ -53,4 +55,11 @@ const terminalApi: TerminalApi = {
   },
 };
 
+const diffApi: DiffApi = {
+  getGitWorkingTreeDiff: async (request) => {
+    return ipcRenderer.invoke(DIFF_IPC_CHANNELS.getGitWorkingTreeDiff, request);
+  },
+};
+
 contextBridge.exposeInMainWorld('terminalApi', terminalApi);
+contextBridge.exposeInMainWorld('diffApi', diffApi);
