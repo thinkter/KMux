@@ -84,4 +84,13 @@ export const THEMES: Record<string, Theme> = {
     textDim: "rgba(248,248,242,0.4)",
     border: "rgba(248,248,242,0.1)",
   },
+  monochrome: {
+    name: "Monochrome",
+    bg: "#050505",
+    panelBg: "rgba(12,12,12,0.96)",
+    accent: "#f2f2f2",
+    text: "#f2f2f2",
+    textDim: "rgba(242,242,242,0.42)",
+    border: "rgba(242,242,242,0.14)",
+  },
 };
