@@ -1,47 +1,75 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { useCanvasStore } from '../store/useCanvasStore';
+import React, { useState, useEffect, useRef } from "react";
+import { useCanvasStore } from "../store/useCanvasStore";
+import {
+  formatCwdHint,
+  getPathBasename,
+  getTerminalSearchText,
+} from "../terminal/shared/cwd-format";
+import { useTerminalRuntime } from "../terminal/renderer/context/useTerminalRuntime";
+
+const getTerminalLabel = (
+  session: ReturnType<typeof useTerminalRuntime>["sessions"][string] | undefined,
+  fallback: string,
+): string => {
+  const foregroundProcess = session?.foregroundProcess?.trim();
+  const shell = session?.shell?.trim();
+  if (foregroundProcess && getPathBasename(foregroundProcess) !== shell) {
+    return foregroundProcess;
+  }
+
+  const cwdHint = formatCwdHint(session?.currentCwd, session?.cwd);
+  return cwdHint?.folder || shell || fallback;
+};
 
 export const FuzzyFinder: React.FC = () => {
-  const { workspaces, theme, isSearchOpen, toggleSearch, jumpToGlobalTerminal } = useCanvasStore();
-  const [query, setQuery] = useState('');
+  const {
+    workspaces,
+    theme,
+    isSearchOpen,
+    toggleSearch,
+    jumpToGlobalTerminal,
+  } = useCanvasStore();
+  const { sessions } = useTerminalRuntime();
+  const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Flatten all terminals with their workspace context
-  const allTerminals = workspaces.flatMap((ws, wsIdx) => 
-    ws.terminals.map(t => ({
+  const allTerminals = workspaces.flatMap((ws, wsIdx) =>
+    ws.terminals.map((t) => ({
       ...t,
-      workspaceName: `Workspace ${wsIdx + 1}`,
-      wsIdx
-    }))
+      workspaceName: `ws ${wsIdx + 1}`,
+      wsIdx,
+    })),
   );
 
-  // Simple fuzzy filter
-  const filtered = allTerminals.filter(t => 
-    t.title.toLowerCase().includes(query.toLowerCase()) ||
-    t.workspaceName.toLowerCase().includes(query.toLowerCase())
-  );
+  const filtered = allTerminals.filter((t) => {
+    const session = sessions[t.id];
+    const label = getTerminalLabel(session, t.title);
+    return getTerminalSearchText(session, t.title, t.workspaceName, label).includes(
+      query.toLowerCase(),
+    );
+  });
 
   useEffect(() => {
     if (isSearchOpen) {
-      setQuery('');
+      setQuery("");
       setSelectedIndex(0);
       setTimeout(() => inputRef.current?.focus(), 10);
     }
   }, [isSearchOpen]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'ArrowDown') {
-      setSelectedIndex(prev => Math.min(prev + 1, filtered.length - 1));
+    if (e.key === "ArrowDown") {
+      setSelectedIndex((prev) => Math.min(prev + 1, filtered.length - 1));
       e.preventDefault();
-    } else if (e.key === 'ArrowUp') {
-      setSelectedIndex(prev => Math.max(prev - 1, 0));
+    } else if (e.key === "ArrowUp") {
+      setSelectedIndex((prev) => Math.max(prev - 1, 0));
       e.preventDefault();
-    } else if (e.key === 'Enter') {
+    } else if (e.key === "Enter") {
       if (filtered[selectedIndex]) {
         jumpToGlobalTerminal(filtered[selectedIndex].id);
       }
-    } else if (e.key === 'Escape') {
+    } else if (e.key === "Escape") {
       toggleSearch();
     }
   };
@@ -49,99 +77,174 @@ export const FuzzyFinder: React.FC = () => {
   if (!isSearchOpen) return null;
 
   return (
-    <div 
-      className="fixed inset-0 z-[100] flex items-start justify-center pt-[15vh] px-4 animate-in fade-in duration-200"
+    <div
+      className="fixed inset-0 z-[100] flex items-start justify-center"
+      style={{ paddingTop: "10vh" }}
       onClick={toggleSearch}
     >
-      {/* Backdrop Blur */}
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
-
-      {/* Main Spotlight Box */}
-      <div 
-        className="relative w-full max-w-[640px] rounded-2xl shadow-2xl overflow-hidden border border-white/10 ring-1 ring-black/50"
-        style={{ 
-          background: theme.panelBg,
-          backdropFilter: 'blur(40px) saturate(150%)',
-          boxShadow: `0 20px 50px rgba(0,0,0,0.5), 0 0 0 1px ${theme.border}`,
+      <div
+        className="w-[480px] overflow-hidden"
+        style={{
+          background: theme.bg,
+          border: `1px solid ${theme.border}`,
+          borderRadius: "6px",
+          boxShadow: "0 8px 32px rgba(0,0,0,0.6)",
         }}
-        onClick={e => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
       >
-        {/* Search Input Area */}
-        <div className="flex items-center px-5 py-4 border-b border-white/5 bg-white/5">
-          <svg className="w-5 h-5 opacity-40 mr-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ color: theme.text }}>
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+        {/* Input */}
+        <div
+          className="flex items-center gap-2 px-3"
+          style={{
+            borderBottom: `1px solid ${theme.border}`,
+            height: "36px",
+          }}
+        >
+          <svg
+            width="13"
+            height="13"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            style={{ color: theme.textDim, flexShrink: 0 }}
+          >
+            <circle cx="11" cy="11" r="8" />
+            <path d="m21 21-4.35-4.35" />
           </svg>
           <input
             ref={inputRef}
             type="text"
-            className="flex-1 bg-transparent border-none outline-none text-xl font-light placeholder:text-white/20"
-            placeholder="Search terminals or sessions..."
-            style={{ color: theme.text }}
+            className="flex-1 bg-transparent border-none outline-none"
+            placeholder="jump to terminal..."
+            style={{
+              color: theme.text,
+              fontFamily: "JetBrains Mono, monospace",
+              fontSize: "12px",
+            }}
             value={query}
-            onChange={e => {
+            onChange={(e) => {
               setQuery(e.target.value);
               setSelectedIndex(0);
             }}
             onKeyDown={handleKeyDown}
           />
-          <div className="text-[10px] px-1.5 py-0.5 rounded border border-white/10 opacity-30 font-mono" style={{ color: theme.text }}>ESC</div>
         </div>
 
-        {/* Results Area */}
-        <div className="max-h-[380px] overflow-y-auto py-2 custom-scrollbar">
+        {/* Results */}
+        <div style={{ maxHeight: "320px", overflowY: "auto" }}>
           {filtered.length === 0 ? (
-            <div className="px-6 py-10 text-center opacity-40 text-sm italic" style={{ color: theme.text }}>
-              No terminals found matching "{query}"
+            <div
+              className="px-3 py-4 text-center"
+              style={{
+                color: theme.textDim,
+                fontFamily: "JetBrains Mono, monospace",
+                fontSize: "11px",
+              }}
+            >
+              no results
             </div>
           ) : (
-            filtered.map((t, i) => (
-              <div
-                key={t.id}
-                className={`flex items-center px-4 py-3 mx-2 rounded-xl cursor-pointer transition-all duration-150 group ${
-                  i === selectedIndex ? 'bg-white/10' : 'hover:bg-white/5'
-                }`}
-                onClick={() => jumpToGlobalTerminal(t.id)}
-                onMouseEnter={() => setSelectedIndex(i)}
-              >
-                {/* Terminal Icon */}
-                <div 
-                  className={`w-10 h-10 rounded-lg flex items-center justify-center mr-4 transition-transform ${i === selectedIndex ? 'scale-110' : ''}`}
-                  style={{ background: i === selectedIndex ? theme.accent : 'rgba(255,255,255,0.05)' }}
+            filtered.map((t, i) => {
+              const session = sessions[t.id];
+              const label = getTerminalLabel(session, t.title);
+              const shell = session?.shell;
+              const showShell = shell && shell !== label;
+              const cwdHint = formatCwdHint(session?.currentCwd, session?.cwd);
+              const cwdPath = cwdHint?.host
+                ? `${cwdHint.host}:${cwdHint.shortPath}`
+                : cwdHint?.shortPath;
+
+              return (
+                <div
+                  key={t.id}
+                  className="flex items-center gap-2 px-3 cursor-pointer"
+                  style={{
+                    height: "30px",
+                    background:
+                      i === selectedIndex ? `${theme.accent}18` : "transparent",
+                    borderLeft:
+                      i === selectedIndex
+                        ? `2px solid ${theme.accent}`
+                        : "2px solid transparent",
+                  }}
+                  onClick={() => jumpToGlobalTerminal(t.id)}
+                  onMouseEnter={() => setSelectedIndex(i)}
                 >
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ color: i === selectedIndex ? '#fff' : theme.textDim }}>
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  <svg
+                    width="12"
+                    height="12"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    style={{
+                      color: i === selectedIndex ? theme.accent : theme.textDim,
+                      flexShrink: 0,
+                    }}
+                  >
+                    <polyline points="4 17 10 11 4 5" />
+                    <line x1="12" y1="19" x2="20" y2="19" />
                   </svg>
-                </div>
-
-                {/* Text Content */}
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium truncate" style={{ color: i === selectedIndex ? theme.text : theme.textDim }}>
-                    {t.title}
-                  </div>
-                  <div className="text-[10px] opacity-40 truncate flex items-center gap-2 uppercase tracking-widest mt-0.5" style={{ color: theme.text }}>
+                  <span
+                    style={{
+                      color: i === selectedIndex ? theme.text : theme.textDim,
+                      fontFamily: "JetBrains Mono, monospace",
+                      fontSize: "12px",
+                      flex: 1,
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {label}
+                  </span>
+                  {cwdHint ? (
+                    <span
+                      style={{
+                        color: i === selectedIndex ? theme.accent : theme.textDim,
+                        fontFamily: "JetBrains Mono, monospace",
+                        fontSize: "10px",
+                        opacity: i === selectedIndex ? 0.9 : 0.62,
+                        flexShrink: 1,
+                        minWidth: 0,
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                      title={cwdHint.host ? `${cwdHint.host}:${cwdHint.fullPath}` : cwdHint.fullPath}
+                    >
+                      {cwdHint.folder} · {cwdPath}
+                    </span>
+                  ) : null}
+                  {showShell ? (
+                    <span
+                      style={{
+                        color: theme.textDim,
+                        fontFamily: "JetBrains Mono, monospace",
+                        fontSize: "10px",
+                        opacity: 0.45,
+                        flexShrink: 0,
+                      }}
+                    >
+                      {shell}
+                    </span>
+                  ) : null}
+                  <span
+                    style={{
+                      color: theme.textDim,
+                      fontFamily: "JetBrains Mono, monospace",
+                      fontSize: "10px",
+                      opacity: 0.5,
+                      flexShrink: 0,
+                    }}
+                  >
                     {t.workspaceName}
-                  </div>
+                  </span>
                 </div>
-
-                {/* Jump Hint */}
-                {i === selectedIndex && (
-                  <div className="text-[10px] font-mono opacity-60 flex items-center gap-1" style={{ color: theme.accent }}>
-                    <span>JUMP</span>
-                    <span className="bg-black/20 px-1 rounded">↵</span>
-                  </div>
-                )}
-              </div>
-            ))
+              );
+            })
           )}
-        </div>
-
-        {/* Footer */}
-        <div className="px-5 py-2 border-t border-white/5 bg-black/10 flex justify-between items-center opacity-40 text-[9px] tracking-wider uppercase" style={{ color: theme.text }}>
-          <div className="flex gap-4">
-            <span>↑↓ Navigate</span>
-            <span>↵ Select</span>
-          </div>
-          <div>{filtered.length} Results</div>
         </div>
       </div>
     </div>

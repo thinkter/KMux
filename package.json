@@ -6,6 +6,9 @@
   "main": ".vite/build/main.js",
   "private": true,
   "packageManager": "pnpm@10.28.2",
+  "engines": {
+    "node": ">=22 <26"
+  },
   "scripts": {
     "dev": "vite --config vite.renderer.config.ts",
     "start": "electron-forge start",

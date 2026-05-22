@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { useCanvasStore } from '../store/useCanvasStore';
-import { WorkspaceRow } from './WorkspaceRow';
-import { FuzzyFinder } from './FuzzyFinder';
+import React, { useState, useEffect, useRef } from "react";
+import { useCanvasStore } from "../store/useCanvasStore";
+import { WorkspaceRow } from "./WorkspaceRow";
+import { FuzzyFinder } from "./FuzzyFinder";
 import {
   OVERVIEW_SCALE,
   SCREEN_HEIGHT_VH,
@@ -9,12 +9,23 @@ import {
   TRANSITION_UI,
   UI_HIDE_TIMEOUT,
   Z_LAYERS,
-} from '../lib/constants';
+} from "../lib/constants";
 
 export const CanvasContainer: React.FC = () => {
-  const { workspaces, activeWorkspaceIndex, isOverview, theme } = useCanvasStore();
+  const { workspaces, activeWorkspaceIndex, isOverview, theme } =
+    useCanvasStore();
 
   const [controlsVisible, setControlsVisible] = useState(true);
+  const previousWorkspaceIndexRef = useRef(activeWorkspaceIndex);
+  const workspaceDistance = Math.abs(
+    activeWorkspaceIndex - previousWorkspaceIndexRef.current,
+  );
+  const workspaceTransitionDuration =
+    workspaceDistance === 0 ? 0 : Math.min(340, 220 + workspaceDistance * 30);
+  const workspaceTransition =
+    workspaceDistance === 0
+      ? "none"
+      : `transform ${workspaceTransitionDuration}ms cubic-bezier(0.16, 1, 0.3, 1)`;
 
   useEffect(() => {
     let id: number;
@@ -26,13 +37,17 @@ export const CanvasContainer: React.FC = () => {
 
   useEffect(() => {
     const poke = () => setControlsVisible(true);
-    window.addEventListener('keydown', poke, true);
-    window.addEventListener('mousemove', poke, true);
+    window.addEventListener("keydown", poke, true);
+    window.addEventListener("mousemove", poke, true);
     return () => {
-      window.removeEventListener('keydown', poke, true);
-      window.removeEventListener('mousemove', poke, true);
+      window.removeEventListener("keydown", poke, true);
+      window.removeEventListener("mousemove", poke, true);
     };
   }, []);
+
+  useEffect(() => {
+    previousWorkspaceIndexRef.current = activeWorkspaceIndex;
+  }, [activeWorkspaceIndex]);
 
   const translateY = -(activeWorkspaceIndex * SCREEN_HEIGHT_VH);
 
@@ -48,15 +63,16 @@ export const CanvasContainer: React.FC = () => {
         className="w-full h-full"
         style={{
           transition: `transform ${TRANSITION_CANVAS}`,
-          transform: isOverview ? `scale(${OVERVIEW_SCALE})` : 'scale(1)',
-          transformOrigin: 'center center',
+          transform: isOverview ? `scale(${OVERVIEW_SCALE})` : "scale(1)",
+          transformOrigin: "center center",
         }}
       >
         <div
-          className="w-full h-full transition-transform"
+          className="w-full h-full"
           style={{
-            transition: `transform ${TRANSITION_CANVAS}`,
-            transform: `translateY(${translateY}vh)`,
+            transition: workspaceTransition,
+            transform: `translate3d(0, ${translateY}vh, 0)`,
+            willChange: "transform",
           }}
         >
           {workspaces.map((ws) => (
@@ -75,25 +91,34 @@ export const CanvasContainer: React.FC = () => {
         className="absolute left-4 top-1/2 -translate-y-1/2 flex flex-col gap-2"
         style={{ zIndex: Z_LAYERS.INDICATORS }}
       >
-        {workspaces.map((_, index) => (
-          <div
-            key={index}
-            className="flex items-center justify-center rounded-lg transition-all duration-700 text-[9px] font-mono font-bold"
-            style={{
-              width: activeWorkspaceIndex === index ? '28px' : '20px',
-              height: activeWorkspaceIndex === index ? '28px' : '20px',
-              background: activeWorkspaceIndex === index ? `${theme.accent}15` : 'rgba(255,255,255,0.02)',
-              border: `1px solid ${activeWorkspaceIndex === index ? `${theme.accent}88` : theme.border}`,
-              color: activeWorkspaceIndex === index ? theme.accent : theme.textDim,
-              opacity: activeWorkspaceIndex === index ? 1 : 0.4,
-              boxShadow: activeWorkspaceIndex === index ? `0 4px 12px ${theme.accent}22` : 'none',
-              transform: activeWorkspaceIndex === index ? 'scale(1.1)' : 'scale(1)',
-              marginLeft: activeWorkspaceIndex === index ? '-4px' : '0'
-            }}
-          >
-            {index + 1}
-          </div>
-        ))}
+        {workspaces.map((workspace, index) => {
+          const isActive = activeWorkspaceIndex === index;
+          if (!isActive && workspace.terminals.length === 0) {
+            return null;
+          }
+
+          return (
+            <div
+              key={workspace.id}
+              className="flex items-center justify-center rounded-lg transition-all duration-150 text-[9px] font-mono font-bold"
+              style={{
+                width: isActive ? "28px" : "20px",
+                height: isActive ? "28px" : "20px",
+                background: isActive
+                  ? `${theme.accent}15`
+                  : "rgba(255,255,255,0.02)",
+                border: `1px solid ${isActive ? `${theme.accent}88` : theme.border}`,
+                color: isActive ? theme.accent : theme.textDim,
+                opacity: isActive ? 1 : 0.4,
+                boxShadow: isActive ? `0 4px 12px ${theme.accent}22` : "none",
+                transform: isActive ? "scale(1.1)" : "scale(1)",
+                marginLeft: isActive ? "-4px" : "0",
+              }}
+            >
+              {index + 1}
+            </div>
+          );
+        })}
       </div>
 
       <div
@@ -102,7 +127,7 @@ export const CanvasContainer: React.FC = () => {
           zIndex: Z_LAYERS.CONTROLS,
           transition: `opacity ${TRANSITION_UI}`,
           opacity: controlsVisible ? 1 : 0,
-          pointerEvents: controlsVisible ? 'auto' : 'none',
+          pointerEvents: controlsVisible ? "auto" : "none",
         }}
       >
         <div
@@ -113,12 +138,20 @@ export const CanvasContainer: React.FC = () => {
             color: theme.textDim,
           }}
         >
-          <div className="border-b pb-2 mb-1 flex justify-between" style={{ borderColor: theme.border }}>
-            <span style={{ color: theme.accent, fontWeight: 700 }}>KMux Controls</span>
+          <div
+            className="border-b pb-2 mb-1 flex justify-between"
+            style={{ borderColor: theme.border }}
+          >
+            <span style={{ color: theme.accent, fontWeight: 700 }}>
+              KMux Controls
+            </span>
             <span>Theme: {theme.name}</span>
           </div>
-          <div className="opacity-40 italic mb-1 text-[9px]">modifiers: alt or super</div>
+          <div className="opacity-40 italic mb-1 text-[9px]">
+            modifiers: alt or super
+          </div>
           <p>arrows - focus terminal / workspace</p>
+          <p>1-9 - jump to workspace</p>
           <p>enter - new terminal</p>
           <p>n - new workspace</p>
           <p>shift + alt + enter - choose terminal profile</p>
@@ -127,6 +160,8 @@ export const CanvasContainer: React.FC = () => {
           <p>o - toggle overview</p>
           <p>f - fuzzy finder</p>
           <p>-/= - resize width</p>
+          <p>ctrl +/- - focused font size</p>
+          <p>ctrl + shift +/- - global font size</p>
         </div>
       </div>
 
@@ -140,7 +175,7 @@ export const CanvasContainer: React.FC = () => {
       >
         <span
           className="text-[10px] tracking-[0.5em] font-light uppercase"
-          style={{ color: theme.text, fontFamily: 'JetBrains Mono, monospace' }}
+          style={{ color: theme.text, fontFamily: "JetBrains Mono, monospace" }}
         >
           {`WORKSPACE ${activeWorkspaceIndex + 1}`}
         </span>
