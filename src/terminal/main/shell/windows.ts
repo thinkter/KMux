@@ -165,18 +165,44 @@ const listVsInstallationRoots = (
 };
 
 const resolveCmd = (env: NodeJS.ProcessEnv): ResolvedShell => {
+  const promptPrefix = '$E]7;file://localhost/$P$E\\';
+  const existingPrompt =
+    typeof env.PROMPT === 'string' && env.PROMPT.length > 0 ? env.PROMPT : '$P$G';
   if (typeof env.ComSpec === 'string' && env.ComSpec.trim().length > 0) {
     return {
       command: env.ComSpec,
       args: [],
       label: 'Command Prompt',
+      env: {
+        PROMPT: `${promptPrefix}${existingPrompt}`,
+      },
+      cwdSignalSource: 'shell-hook',
     };
   }
   return {
     command: 'cmd.exe',
     args: [],
     label: 'Command Prompt',
+    env: {
+      PROMPT: `${promptPrefix}${existingPrompt}`,
+    },
+    cwdSignalSource: 'shell-hook',
   };
+};
+
+const createPowerShellPromptHook = (): string => {
+  return [
+    '$global:KMuxOriginalPrompt = if (Test-Path function:\\prompt) {',
+    '  (Get-Command prompt).ScriptBlock',
+    "} else { { 'PS ' + (Get-Location).Path + '> ' } };",
+    'function global:prompt {',
+    '  $location = (Get-Location);',
+    '  $path = $location.ProviderPath;',
+    '  if (-not $path) { $path = $location.Path; }',
+    '  [Console]::Write("$([char]27)]7;file://localhost/$path$([char]27)\\");',
+    '  & $global:KMuxOriginalPrompt',
+    '}',
+  ].join(' ');
 };
 
 const resolveWindowsPowerShell = (
@@ -193,8 +219,9 @@ const resolveWindowsPowerShell = (
   }
   return {
     command: powershellPath,
-    args: ['-NoLogo'],
+    args: ['-NoLogo', '-NoExit', '-Command', createPowerShellPromptHook()],
     label: 'Windows PowerShell',
+    cwdSignalSource: 'shell-hook',
   };
 };
 
@@ -219,8 +246,9 @@ const resolvePwsh = (
   }
   return {
     command: pwshPath,
-    args: ['-NoLogo'],
+    args: ['-NoLogo', '-NoExit', '-Command', createPowerShellPromptHook()],
     label: 'PowerShell',
+    cwdSignalSource: 'shell-hook',
   };
 };
 
@@ -255,6 +283,8 @@ const createProfileEntry = (
       command: shell.command,
       args: [...shell.args],
       label: shell.label,
+      env: shell.env ? { ...shell.env } : undefined,
+      cwdSignalSource: shell.cwdSignalSource,
     },
     aliases: aliases.map((alias) => normalizeTerminalProfileId(alias)),
   };

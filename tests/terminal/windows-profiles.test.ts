@@ -40,6 +40,7 @@ test('windows profile detection returns the expected default profile set', () =>
     path.win32.join('C:\\Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe'),
     path.win32.join('C:\\Program Files', 'PowerShell', '7', 'pwsh.exe'),
     path.win32.join('C:\\Windows', 'System32', 'wsl.exe'),
+    path.win32.join('C:\\Program Files', 'Microsoft Visual Studio', '2022', 'Community'),
     path.win32.join('C:\\Program Files', 'Microsoft Visual Studio', '2022', 'Community', 'Common7', 'Tools', 'VsDevCmd.bat'),
     path.win32.join('C:\\Program Files', 'Microsoft Visual Studio', '2022', 'Community', 'Common7', 'Tools', 'Launch-VsDevShell.ps1'),
     path.win32.join('C:\\Tools\\AzureCLI', 'azshell.exe'),
@@ -100,6 +101,7 @@ test('windows shell resolver supports aliases and defaults', () => {
     path.win32.join('C:\\Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe'),
     path.win32.join('C:\\Program Files', 'PowerShell', '7', 'pwsh.exe'),
     path.win32.join('C:\\Windows', 'System32', 'wsl.exe'),
+    path.win32.join('C:\\Program Files', 'Microsoft Visual Studio', '2022', 'Community'),
     path.win32.join('C:\\Program Files', 'Microsoft Visual Studio', '2022', 'Community', 'Common7', 'Tools', 'VsDevCmd.bat'),
     path.win32.join('C:\\Program Files', 'Microsoft Visual Studio', '2022', 'Community', 'Common7', 'Tools', 'Launch-VsDevShell.ps1'),
     path.win32.join('C:\\Tools\\AzureCLI', 'azshell.exe'),
@@ -110,6 +112,35 @@ test('windows shell resolver supports aliases and defaults', () => {
   assert.equal(resolveWindowsShell(env, 'command-prompt', runtime).label, 'Command Prompt');
   assert.equal(resolveWindowsShell(env, 'powershell', runtime).label, 'PowerShell');
   assert.equal(resolveWindowsShell(env, 'ubuntu', runtime).label, 'Ubuntu');
+});
+
+test('windows shell resolver injects cwd prompt hooks only for direct supported shells', () => {
+  const env = createWindowsEnv();
+  const runtime = makeRuntime([
+    path.win32.join('C:\\Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe'),
+    path.win32.join('C:\\Program Files', 'PowerShell', '7', 'pwsh.exe'),
+    path.win32.join('C:\\Windows', 'System32', 'wsl.exe'),
+    path.win32.join('C:\\Program Files', 'Microsoft Visual Studio', '2022', 'Community'),
+    path.win32.join('C:\\Program Files', 'Microsoft Visual Studio', '2022', 'Community', 'Common7', 'Tools', 'Launch-VsDevShell.ps1'),
+  ]);
+
+  const commandPrompt = resolveWindowsShell(env, 'command-prompt', runtime);
+  assert.equal(commandPrompt.cwdSignalSource, 'shell-hook');
+  assert.match(commandPrompt.env?.PROMPT ?? '', /\$E\]7;file:\/\/localhost\/\$P\$E\\/);
+  assert.match(commandPrompt.env?.PROMPT ?? '', /\$P\$G/);
+
+  const windowsPowerShell = resolveWindowsShell(env, 'windows-powershell', runtime);
+  assert.equal(windowsPowerShell.cwdSignalSource, 'shell-hook');
+  assert.deepEqual(windowsPowerShell.args.slice(0, 3), ['-NoLogo', '-NoExit', '-Command']);
+  assert.match(windowsPowerShell.args[3], /KMuxOriginalPrompt/);
+  assert.match(windowsPowerShell.args[3], /file:\/\/localhost/);
+
+  const powerShell = resolveWindowsShell(env, 'powershell', runtime);
+  assert.equal(powerShell.cwdSignalSource, 'shell-hook');
+  assert.deepEqual(powerShell.args.slice(0, 3), ['-NoLogo', '-NoExit', '-Command']);
+
+  const wsl = resolveWindowsShell(env, 'ubuntu', runtime);
+  assert.equal(wsl.cwdSignalSource, undefined);
 });
 
 test('windows shell resolver gracefully falls back to command prompt', () => {

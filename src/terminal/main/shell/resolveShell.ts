@@ -7,6 +7,8 @@ export interface ResolvedShell {
   command: string;
   args: string[];
   label: string;
+  env?: Record<string, string>;
+  cwdSignalSource?: 'shell-hook';
 }
 
 export const resolveShell = (

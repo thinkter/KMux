@@ -1,12 +1,24 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useCanvasStore } from "../store/useCanvasStore";
+import {
+  formatCwdHint,
+  getPathBasename,
+  getTerminalSearchText,
+} from "../terminal/shared/cwd-format";
 import { useTerminalRuntime } from "../terminal/renderer/context/useTerminalRuntime";
 
 const getTerminalLabel = (
   session: ReturnType<typeof useTerminalRuntime>["sessions"][string] | undefined,
   fallback: string,
 ): string => {
-  return session?.foregroundProcess || session?.shell || fallback;
+  const foregroundProcess = session?.foregroundProcess?.trim();
+  const shell = session?.shell?.trim();
+  if (foregroundProcess && getPathBasename(foregroundProcess) !== shell) {
+    return foregroundProcess;
+  }
+
+  const cwdHint = formatCwdHint(session?.currentCwd, session?.cwd);
+  return cwdHint?.folder || shell || fallback;
 };
 
 export const FuzzyFinder: React.FC = () => {
@@ -33,11 +45,8 @@ export const FuzzyFinder: React.FC = () => {
   const filtered = allTerminals.filter((t) => {
     const session = sessions[t.id];
     const label = getTerminalLabel(session, t.title);
-    const shell = session?.shell ?? "";
-    return (
-      label.toLowerCase().includes(query.toLowerCase()) ||
-      shell.toLowerCase().includes(query.toLowerCase()) ||
-      t.workspaceName.toLowerCase().includes(query.toLowerCase())
+    return getTerminalSearchText(session, t.title, t.workspaceName, label).includes(
+      query.toLowerCase(),
     );
   });
 
@@ -141,6 +150,10 @@ export const FuzzyFinder: React.FC = () => {
               const label = getTerminalLabel(session, t.title);
               const shell = session?.shell;
               const showShell = shell && shell !== label;
+              const cwdHint = formatCwdHint(session?.currentCwd, session?.cwd);
+              const cwdPath = cwdHint?.host
+                ? `${cwdHint.host}:${cwdHint.shortPath}`
+                : cwdHint?.shortPath;
 
               return (
                 <div
@@ -186,6 +199,24 @@ export const FuzzyFinder: React.FC = () => {
                   >
                     {label}
                   </span>
+                  {cwdHint ? (
+                    <span
+                      style={{
+                        color: i === selectedIndex ? theme.accent : theme.textDim,
+                        fontFamily: "JetBrains Mono, monospace",
+                        fontSize: "10px",
+                        opacity: i === selectedIndex ? 0.9 : 0.62,
+                        flexShrink: 1,
+                        minWidth: 0,
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                      title={cwdHint.host ? `${cwdHint.host}:${cwdHint.fullPath}` : cwdHint.fullPath}
+                    >
+                      {cwdHint.folder} · {cwdPath}
+                    </span>
+                  ) : null}
                   {showShell ? (
                     <span
                       style={{

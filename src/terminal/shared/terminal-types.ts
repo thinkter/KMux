@@ -2,6 +2,15 @@ import type { TerminalProfile, TerminalProfileId } from './terminal-profiles';
 export type { TerminalProfile, TerminalProfileId } from './terminal-profiles';
 
 export type TerminalStatus = 'starting' | 'running' | 'exited' | 'error';
+export type TerminalCwdSource = 'initial' | 'osc7' | 'procfs' | 'lsof' | 'shell-hook';
+
+export interface TerminalCurrentCwd {
+  path: string;
+  host?: string;
+  isLocal: boolean;
+  source: TerminalCwdSource;
+  updatedAt: number;
+}
 
 export interface TerminalSessionSnapshot {
   terminalId: string;
@@ -10,6 +19,7 @@ export interface TerminalSessionSnapshot {
   shell: string;
   foregroundProcess?: string;
   cwd: string;
+  currentCwd?: TerminalCurrentCwd;
   cols: number;
   rows: number;
   status: TerminalStatus;
